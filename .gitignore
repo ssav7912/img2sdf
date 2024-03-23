@@ -1,0 +1,13 @@
+*.bin
+*.exe
+*.dll
+*.so
+*.o
+*.hcs
+*.zip
+*.tar.gz
+cmake-build-debug/
+libpng++/
+*.png
+*.tif
+.idea/
