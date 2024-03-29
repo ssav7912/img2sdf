@@ -159,12 +159,12 @@ HRESULT dxinit::create_compute_shader(LPCWSTR source_file, LPCSTR function_name,
 }
 
 void dxinit::run_compute_shader(ID3D11DeviceContext *immediate_context, ID3D11ComputeShader *shader, UINT num_views,
-                                   ID3D11ShaderResourceView **views, ID3D11Buffer *CBCS, void *shader_data,
-                                   DWORD data_bytes, ID3D11UnorderedAccessView *uav, UINT x, UINT y, UINT z) {
+                                   ID3D11ShaderResourceView **views, ID3D11Buffer *CBCS, const void *shader_data,
+                                   DWORD data_bytes, ID3D11UnorderedAccessView **uav, size_t num_UAVs, UINT x, UINT y, UINT z) {
 
     immediate_context->CSSetShader(shader, nullptr, 0);
     immediate_context->CSSetShaderResources(0, num_views, views);
-    immediate_context->CSSetUnorderedAccessViews(0,1, &uav, nullptr);
+    immediate_context->CSSetUnorderedAccessViews(0,num_UAVs, uav, nullptr);
 
     if (CBCS && shader_data)
     {
@@ -174,6 +174,10 @@ void dxinit::run_compute_shader(ID3D11DeviceContext *immediate_context, ID3D11Co
         immediate_context->Unmap(CBCS, 0);
         ID3D11Buffer* CB[1] = {CBCS};
         immediate_context->CSSetConstantBuffers(0,1,CB);
+    }
+    else if (CBCS && shader_data == nullptr)
+    {
+        immediate_context->CSSetConstantBuffers(0, 1, &CBCS);
     }
 
     immediate_context->Dispatch(x,y,z);

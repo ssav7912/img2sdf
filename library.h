@@ -11,6 +11,7 @@ struct float4
     float z = 0;
     float w = 0;
 };
+
 static_assert(sizeof(float4) == sizeof(float)*4, "Size of float4 struct does not conform to HLSL float4 size!");
 
 namespace parsing{

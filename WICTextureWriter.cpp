@@ -48,7 +48,7 @@ GUID WICTextureWriter::format_from_extension(std::filesystem::path out_path) {
 }
 
 HRESULT WICTextureWriter::write_texture(std::filesystem::path out_path, size_t width, size_t height, size_t stride, size_t size,
-                                        WICPixelFormatGUID px_format, const void* buffer)
+                                        WICPixelFormatGUID in_px_format, WICPixelFormatGUID out_px_format, const void* buffer)
 {
     if (buffer == nullptr)
     {
@@ -104,14 +104,22 @@ HRESULT WICTextureWriter::write_texture(std::filesystem::path out_path, size_t w
             hr = bitmap_frame->SetSize(width, height);
         }
         //if this != px_format after SetPixelFormat, then we must perform a conversion operation.
-        WICPixelFormatGUID format = px_format;
+        WICPixelFormatGUID format = out_px_format;
+
         if (SUCCEEDED(hr))
         {
 
             hr = bitmap_frame->SetPixelFormat(&format);
+#if DEBUG
+            wchar_t short_name[256] = {0};
+            uint32_t out_size = 0;
+            HRESULT shortnameresult = WICMapGuidToShortName(format, 256, short_name, &out_size);
+            printf("%lx: Output texture converted format is%s the same as out_px_format.\n",
+                   shortnameresult, IsEqualGUID(format, out_px_format) ? "" : " not");
+#endif
         }
         ComPtr<IWICBitmap> bit_map;
-        hr = factory->CreateBitmapFromMemory(width, height, px_format, stride, size, (BYTE*)buffer, bit_map.GetAddressOf());
+        hr = factory->CreateBitmapFromMemory(width, height, in_px_format, stride, size, (BYTE*)buffer, bit_map.GetAddressOf());
         if (FAILED(hr))
         {
             return hr;
@@ -123,7 +131,7 @@ HRESULT WICTextureWriter::write_texture(std::filesystem::path out_path, size_t w
 
             //SetPixelFormat places the format it's writing into its inoutparam, make sure it's the same
             //as what we gave it.
-            if (!IsEqualGUID(px_format, format))
+            if (!IsEqualGUID(in_px_format, format))
             {
 
                 ComPtr<IWICFormatConverter> format_converter;
@@ -132,7 +140,9 @@ HRESULT WICTextureWriter::write_texture(std::filesystem::path out_path, size_t w
                 {
                     return hr;
                 }
-                hr = format_converter->Initialize(bit_map.Get(), format,  WICBitmapDitherTypeErrorDiffusion, 0, 0, WICBitmapPaletteTypeCustom);
+                ComPtr<IWICPalette> palette;
+                bit_map->CopyPalette(palette.Get());
+                hr = format_converter->Initialize(bit_map.Get(), format,  WICBitmapDitherTypeNone, palette.Get(), 0, WICBitmapPaletteTypeMedianCut);
                 if (FAILED(hr))
                 {
                     return hr;

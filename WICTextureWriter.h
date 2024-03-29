@@ -25,11 +25,11 @@ public:
     ///@param height the height of the resource in pixels
     ///@param stride the 'stride' of the data, in bytes, from one line to the next.
     ///@param size the size of the resource, in bytes.
-    ///@param px_format the desired output pixel format. This must match the format the resource is in. If the format is unsupported
+    ///@param in_px_format the desired output pixel format. This must match the format the resource is in. If the format is unsupported
     ///by the output container, a conversion is made to the 'nearest' type, which may be lossy.
     ///@param buffer pointer to raw pixel data.
     HRESULT write_texture(std::filesystem::path out_path, size_t width, size_t height, size_t stride, size_t size,
-                          WICPixelFormatGUID px_format, const void* buffer);
+                          WICPixelFormatGUID in_px_format, WICPixelFormatGUID format_px_format, const void* buffer);
 private:
     ComPtr<IWICImagingFactory> factory = nullptr;
     ComPtr<IWICBitmapEncoder> encoder = nullptr;

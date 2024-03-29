@@ -37,10 +37,9 @@ add_executable(img2sdf library.cpp
 #Build HLSL
 add_custom_target(shaders COMMENT "Shader Compilation")
 
-set(HLSL_SHADER_FILES preprocess.hlsl)
-set_source_files_properties(preprocess.hlsl PROPERTIES ShaderType "cs")
-set_source_files_properties(preprocess.hlsl PROPERTIES EntryPoint "preprocess")
-#set_source_files_properties(jumpflood.hlsl PROPERTIES ShaderType "cs")
+set(HLSL_SHADER_FILES jumpflood.hlsl)
+set_source_files_properties(jumpflood.hlsl PROPERTIES ShaderType "cs")
+set_source_files_properties(jumpflood.hlsl PROPERTIES EntryPoint "main")
 set_source_files_properties(${HLSL_SHADER_FILES} PROPERTIES ShaderModel "5_0")
 
 

@@ -31,8 +31,8 @@ namespace dxinit {
 
     _Use_decl_annotations_
     void run_compute_shader(ID3D11DeviceContext* immediate_context, ID3D11ComputeShader* shader, UINT num_views,
-                               ID3D11ShaderResourceView** views, ID3D11Buffer* CBCS, void* shader_data, DWORD data_bytes,
-                               ID3D11UnorderedAccessView* uav, UINT x, UINT y, UINT z);
+                               ID3D11ShaderResourceView** views, ID3D11Buffer* CBCS, const void* shader_data, DWORD data_bytes,
+                               ID3D11UnorderedAccessView** uav, size_t num_UAVs, UINT x, UINT y, UINT z);
 
     _Use_decl_annotations_
     ID3D11Buffer* create_and_copy_debug_buffer(ID3D11Device* device, ID3D11DeviceContext* context, ID3D11Buffer* buffer);

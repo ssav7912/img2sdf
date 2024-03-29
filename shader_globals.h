@@ -12,5 +12,13 @@
 #include <memory>
 #include <vector>
 
+#pragma pack(16)
+struct JFA_cbuffer
+{
+    float Width;
+    float Height;
+    const uint8_t Padding[16-2*sizeof(float)];
+};
+
 
 #endif //IMG2SDF_SHADER_GLOBALS_H
