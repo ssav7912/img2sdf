@@ -32,6 +32,8 @@ add_executable(img2sdf library.cpp
         library.h
         WICTextureWriter.cpp
         WICTextureWriter.h
+        JumpFloodResources.cpp
+        JumpFloodResources.h
 )
 
 #Build HLSL
