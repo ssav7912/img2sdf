@@ -1,14 +1,6 @@
+#include "utils.hlsi"
 
-Texture2D<float> MaskIn : register(t0);
 RWTexture2D<float4> Seeds : register(u0);
-RWTexture2D<float> Distance : register(u1);
-
-cbuffer constants : register(b0)
-{
-    float Width;
-    float Height;
-};
-
 
 float offset(float width, int pass_index)
 {
@@ -33,16 +25,9 @@ void minimum_distance(float2 position, float4 target_point, inout float4 mindist
     }
 }
 
-//translate a 2D index into a 1D index (i.e. as though data were flat)
-uint index_2D_to_1D(uint2 index, float Width)
-{
-    return floor(index.x * Width) + index.y;
-
-}
 
 ///Preprocess a bw mask to format required for seed points
 ///X coord, Y coord, SeedID + 1, Distance (init to INF)
-//[numthreads(8,8,1)]
 void mask_preprocess(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     if (MaskIn[dispatchThreadId.xy] > 0.0)
@@ -58,11 +43,6 @@ void mask_preprocess(uint3 dispatchThreadId : SV_DispatchThreadID)
 void main(uint3 groupId : SV_GroupID, uint3 groupThreadID : SV_GroupThreadID, uint3 dispatchThreadId : SV_DispatchThreadID,
             uint groupIndex : SV_GroupIndex)
 {
-    mask_preprocess(dispatchThreadId);
-
-
-    AllMemoryBarrierWithGroupSync();
-
     //compute voronoi diagram.
     int iterations = num_steps(Width);
 
@@ -111,11 +91,23 @@ void main(uint3 groupId : SV_GroupID, uint3 groupThreadID : SV_GroupThreadID, ui
 
         AllMemoryBarrierWithGroupSync(); //can't proceed with next pass until current pass is done.
     }
+//
+//     AllMemoryBarrierWithGroupSync();
+//
+//     //do distance transform
+//     float maximum = -1.#INF;
+//     float minimum = 1.#INF;
+//
+//     float d = distance(Seeds[dispatchThreadId.xy].xy, dispatchThreadId.xy);
+//     Distance[dispatchThreadId.xy] = d;
+//     maximum = max(d, maximum);
+//     minimum = min(d, minimum);
+//
+//     AllMemoryBarrierWithGroupSync();
+//
+//     float dist = Distance[dispatchThreadId.xy];
+//
+//     Distance[dispatchThreadId.xy] = minimum;
 
-    AllMemoryBarrierWithGroupSync();
-
-    //do distance transform
-    float d = distance(Seeds[dispatchThreadId.xy].xy, dispatchThreadId.xy);
-    Distance[dispatchThreadId.xy] = d;
 }
 

@@ -37,5 +37,12 @@ struct JFA_cbuffer
     const uint8_t Padding[16-2*sizeof(float)];
 };
 
+#pragma pack(16)
+struct normalise_cbuffer
+{
+    float minimum;
+    float maximum;
+    const uint8_t padding[16-2*sizeof(float)];
+};
 
 #endif //IMG2SDF_SHADER_GLOBALS_H

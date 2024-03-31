@@ -88,6 +88,7 @@ ID3D11Texture2D* JumpFloodResources::create_staging_texture(ID3D11Texture2D* mim
 
     staging_desc.Usage = D3D11_USAGE_STAGING;
     staging_desc.BindFlags = 0;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
     ComPtr<ID3D11Texture2D> CPU_read_texture = nullptr;
     HRESULT out_staging = device->CreateTexture2D(&staging_desc, nullptr, CPU_read_texture.GetAddressOf());

@@ -1,3 +1,4 @@
+#include "utils.hlsi"
 
 Texture2D<float> MaskIn : register(t0);
 RWTexture2D<float4> Seeds : register(u0);
@@ -9,7 +10,7 @@ void preprocess(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
     if (MaskIn[dispatchThreadId.xy] > 0.0)
     {
-        Seeds[dispatchThreadId.xy] = float4(dispatchThreadId.x, dispatchThreadId.y, 0, 1.#INF);
+        Seeds[dispatchThreadId.xy] = float4(dispatchThreadId.x, dispatchThreadId.y, index_2D_to_1D(dispatchThreadId.xy, Width) + 1, 1.#INF);
     }
 
 

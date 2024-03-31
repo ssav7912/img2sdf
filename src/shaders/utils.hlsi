@@ -1,0 +1,19 @@
+
+cbuffer constants : register(b0)
+{
+    float Width;
+    float Height;
+};
+
+//translate a 2D index into a 1D index (i.e. as though data were flat)
+uint index_2D_to_1D(uint2 index, float Width)
+{
+    return floor(index.x * Width) + index.y;
+
+}
+
+
+float remap(float value, float in_low, float in_high, float out_low, float out_high)
+{
+    return out_low + (value - in_low) * (out_high - out_low) / (in_high - in_low);
+}

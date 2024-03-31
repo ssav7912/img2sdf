@@ -4,7 +4,6 @@
 
 #include <iostream>
 #include <d3d11.h>
-#include "jumpflood.hcs"
 #include "shader_globals.h"
 #include <wrl.h>
 #include <vector>
@@ -14,6 +13,10 @@
 #include "dxutils.h"
 #include "WICTextureWriter.h"
 #include "JumpFloodResources.h"
+
+//HLSL bytecode includes
+#include "jumpflood.hcs"
+#include "preprocess.hcs"
 
 using namespace Microsoft::WRL;
 
@@ -37,7 +40,7 @@ int main(int32_t argc, const char** argv)
     //parse arguments
     argparse::ArgumentParser program_parser {parsing::PROGRAM_NAME};
     program_parser.add_argument(parsing::INPUT_ARGUMENT).help("Input image to jumpflood. Must be either"
-                                                              "a PNG, EXR, BMP, TIFF or DDS.");
+                                                              "a PNG, EXR, BMP, TIFF or DDS. Must have width & height a power of 2.");
 
     program_parser.add_argument(parsing::OUTPUT_ARGUMENT).help("Output image.");
 
@@ -57,9 +60,17 @@ int main(int32_t argc, const char** argv)
     hr = dxinit::device->CreateComputeShader(g_main, sizeof(g_main), nullptr, &jumpflood_shader);
     if (FAILED(hr))
     {
-        printf("Failed to create preprocess shader from compiled byte code.");
+        printf("Failed to create jump flood shader from compiled byte code.");
         return -1;
 
+    }
+
+    ComPtr<ID3D11ComputeShader> preprocess_shader;
+    hr = dxinit::device->CreateComputeShader(g_preprocess, sizeof(g_preprocess), nullptr, &preprocess_shader);
+    if (FAILED(hr))
+    {
+        printf("Failed to create preprocess shader from compiled bytecode.\n");
+        return -1;
     }
 
     //create input texture
@@ -99,10 +110,19 @@ int main(int32_t argc, const char** argv)
 
     const size_t Width = jfa_resources.get_resolution().width;
     const size_t Height = jfa_resources.get_resolution().height;
+    const uint32_t num_groups_x = Width/8;
+    const uint32_t num_groups_y = Height/8;
 
-    printf("Running Compute Shader\n");
-    uint32_t num_groups_x = Width/8;
-    uint32_t num_groups_y = Height/8;
+    printf("Running Preprocess Compute Shader\n");
+    {
+        ID3D11UnorderedAccessView* UAV = voronoi_uav;
+        dxinit::run_compute_shader(dxinit::context.Get(), preprocess_shader.Get(), 1, &in_srv,
+                                   const_buffer, nullptr, 0, UAV, 1, num_groups_x, num_groups_y, 1);
+
+    }
+
+    printf("Running Voronoi Compute Shader\n");
+
     ID3D11UnorderedAccessView* UAVs[] = {voronoi_uav, distance_uav};
     constexpr size_t num_uavs = sizeof(UAVs)/sizeof(UAVs[0]);
     dxinit::run_compute_shader(dxinit::context.Get(), jumpflood_shader.Get(), 1, &in_srv,
@@ -117,11 +137,8 @@ int main(int32_t argc, const char** argv)
     std::vector<float> out_data (Width * Height, 0.0f);
     HRESULT map_hr = dxinit::context->Map(CPU_read_texture, 0, D3D11_MAP_READ, 0, &mapped_resource);
 
-
-
-
     if (SUCCEEDED(map_hr)){
-        WICTextureWriter writer;
+        WICTextureWriter writer {};
         dxutils::copy_to_buffer(mapped_resource.pData, Height, mapped_resource.RowPitch, sizeof(float)*Width, out_data.data());
 
 
