@@ -12,6 +12,12 @@
 #include <memory>
 #include <vector>
 
+struct resolution
+{
+    size_t width;
+    size_t height;
+};
+
 #pragma pack()
 struct float4
 {

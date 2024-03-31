@@ -17,7 +17,7 @@ void dxutils::copy_to_buffer(const void *in_buffer, size_t buffer_height, size_t
 
 }
 
-std::pair<dxutils::ComPtr<ID3D11Resource>, dxutils::ComPtr<ID3D11ShaderResourceView>> dxutils::load_texture_to_srv(const std::wstring &texture_path, ID3D11Device* device, ID3D11DeviceContext* context) {
+std::pair<dxutils::ComPtr<ID3D11Resource>, dxutils::ComPtr<ID3D11ShaderResourceView>> dxutils::load_texture_to_srv(const std::wstring &texture_path, ID3D11Device* device) {
 
 
     ID3D11Resource* resource;

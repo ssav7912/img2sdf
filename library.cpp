@@ -13,6 +13,7 @@
 #include "dxinit.h"
 #include "dxutils.h"
 #include "WICTextureWriter.h"
+#include "JumpFloodResources.h"
 
 using namespace Microsoft::WRL;
 
@@ -65,133 +66,47 @@ int main(int32_t argc, const char** argv)
     auto texture_name = program_parser.get(parsing::INPUT_ARGUMENT);
     auto absolute_texture_path = std::filesystem::absolute({texture_name});
 
-    auto in_texture = dxutils::load_texture_to_srv(absolute_texture_path.wstring(), dxinit::device.Get(), dxinit::context.Get());
+    auto jfa_resources = JumpFloodResources(dxinit::device.Get(), absolute_texture_path.wstring());
 
-    ComPtr<ID3D11Texture2D> preprocess_texture;
-    if (FAILED(in_texture.first.As<ID3D11Texture2D>(&preprocess_texture)))
-    {
-        printf("Returned resource was not a texture.");
-        return -1;
-    }
-
-    D3D11_TEXTURE2D_DESC input_texture_description;
-    preprocess_texture->GetDesc(&input_texture_description);
-
-    if (input_texture_description.Format != DXGI_FORMAT_R32_FLOAT)
-    {
-        printf("WARNING: Input format is not a grayscale mask.\n");
-    }
+    ID3D11ShaderResourceView* in_srv = jfa_resources.get_input_srv();
 
 
     //create output UAV.
+    ID3D11UnorderedAccessView* voronoi_uav = jfa_resources.create_voronoi_uav();
 
-    D3D11_TEXTURE2D_DESC structured = input_texture_description;
-    structured.Usage = D3D11_USAGE_DEFAULT;
-    structured.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    structured.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
-    structured.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    structured.MiscFlags = NULL;
+    //create distance UAV.
+    ID3D11UnorderedAccessView* distance_uav = jfa_resources.create_distance_uav();
 
-    ComPtr<ID3D11Texture2D> structured_texture = nullptr;
-
-    D3D11_SUBRESOURCE_DATA structured_data;
-    std::vector<float4> initstructureddata {structured.Width * structured.Height, float4 {0,0,0,0}};
-    structured_data.pSysMem = initstructureddata.data();
-    structured_data.SysMemPitch = sizeof(float4) * structured.Width;
-
-
-    HRESULT out_tex_result = dxinit::device->CreateTexture2D(&structured, &structured_data, &structured_texture);
-    if (FAILED(out_tex_result))
-    {
-        printf("Could not create output texture");
-        return -1;
-    }
-
-    ComPtr<ID3D11UnorderedAccessView> structured_buffer;
-
-    HRESULT buffer_result = dxinit::device->CreateUnorderedAccessView(static_cast<ID3D11Resource*>(structured_texture.Get()),
-                                                                      nullptr, &structured_buffer);
-
-    if (FAILED(buffer_result))
-    {
-        printf("Could not create output UAV\n");
-        return -1;
-    }
-
-    D3D11_TEXTURE2D_DESC distance_output = structured;
-    distance_output.Format = DXGI_FORMAT_R32_FLOAT;
-
+    //get resource for staging texture.
     ComPtr<ID3D11Texture2D> distance_texture = nullptr;
 
-    D3D11_SUBRESOURCE_DATA distance_data;
-    std::vector<float> init_distance_data (distance_output.Width * distance_output.Height, 0.0f);
-    distance_data.pSysMem = init_distance_data.data();
-    distance_data.SysMemPitch = sizeof(float) * distance_output.Width;
-
-    HRESULT out_distance_tex_result = dxinit::device->CreateTexture2D(&distance_output, &distance_data, distance_texture.GetAddressOf());
-
-    if (FAILED(out_distance_tex_result))
+    //inner scope to release temporary distance_resource after ownership is transferred.
     {
-        printf("Could not create output distance texture.\n");
-        return -1;
+        ComPtr<ID3D11Resource> distance_resource;
+        distance_uav->GetResource(distance_resource.GetAddressOf());
+
+        if (FAILED(distance_resource.As<ID3D11Texture2D>(&distance_texture))) {
+            printf("Returned Resource from Distance UAV was not a Texture2D\n");
+            return -1;
+        }
     }
 
-    ComPtr<ID3D11UnorderedAccessView> distance_buffer;
-    HRESULT dist_buffer_result = dxinit::device->CreateUnorderedAccessView(static_cast<ID3D11Resource*>(distance_texture.Get()), nullptr, distance_buffer.GetAddressOf());
-
-    if (FAILED(dist_buffer_result))
-    {
-        printf("Could not create output distance UAV\n");
-        return -1;
-    }
-
-    //create input constants
-    const float width_float = static_cast<float>(structured.Width);
-    const JFA_cbuffer cbuffer = {width_float, static_cast<float>(structured.Height), 0};
-
-
-    D3D11_BUFFER_DESC const_buffer_desc = {0};
-    const_buffer_desc.ByteWidth = sizeof(cbuffer);
-    const_buffer_desc.Usage = D3D11_USAGE_IMMUTABLE;
-    const_buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-
-    D3D11_SUBRESOURCE_DATA const_buffer_resource = {};
-    const_buffer_resource.pSysMem = &cbuffer;
-    const_buffer_resource.SysMemPitch = 0;
-    const_buffer_resource.SysMemSlicePitch = 0;
-
-    ComPtr<ID3D11Buffer> const_buffer;
-    HRESULT const_buffer_result = dxinit::device->CreateBuffer(&const_buffer_desc, &const_buffer_resource, const_buffer.GetAddressOf());
-    if (FAILED(const_buffer_result))
-    {
-        printf("Could not create buffer for shader constants.\n");
-        return -1;
-    }
+    //create const buffer with resource Width and Height.
+    ID3D11Buffer* const_buffer = jfa_resources.create_const_buffer();
 
     //create staging texture for CPU read.
-    D3D11_TEXTURE2D_DESC CPU_read = distance_output;
-    CPU_read.Usage = D3D11_USAGE_STAGING;
-    CPU_read.BindFlags = 0;
+    ID3D11Texture2D* CPU_read_texture = jfa_resources.create_staging_texture(distance_texture.Get());
 
-    ID3D11Texture2D* CPU_read_texture = nullptr;
-    D3D11_SUBRESOURCE_DATA CPU_read_data = distance_data;
-
-    HRESULT out_text_result = dxinit::device->CreateTexture2D(&CPU_read, &CPU_read_data, &CPU_read_texture);
-    if (FAILED(out_text_result))
-    {
-        printf("Could not create CPU readback texture\n");
-        return -1;
-    }
-
-    const size_t Width = distance_output.Width;
-    const size_t Height = distance_output.Height;
+    const size_t Width = jfa_resources.get_resolution().width;
+    const size_t Height = jfa_resources.get_resolution().height;
 
     printf("Running Compute Shader\n");
     uint32_t num_groups_x = Width/8;
     uint32_t num_groups_y = Height/8;
-    ID3D11UnorderedAccessView* UAVs[] = {structured_buffer.Get(), distance_buffer.Get()};
-    dxinit::run_compute_shader(dxinit::context.Get(), jumpflood_shader.Get(), 1, in_texture.second.GetAddressOf(),
-                               const_buffer.Get(), nullptr, 0, UAVs, 2, num_groups_x, num_groups_y, 1);
+    ID3D11UnorderedAccessView* UAVs[] = {voronoi_uav, distance_uav};
+    constexpr size_t num_uavs = sizeof(UAVs)/sizeof(UAVs[0]);
+    dxinit::run_compute_shader(dxinit::context.Get(), jumpflood_shader.Get(), 1, &in_srv,
+                               const_buffer, nullptr, 0, UAVs, num_uavs, num_groups_x, num_groups_y, 1);
 
 
     //copy the finished texture into our staging texture.
