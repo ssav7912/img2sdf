@@ -26,6 +26,8 @@ class JumpFloodResources {
 public:
     ///Initialises the input SRV and texture from the given file path.
     ///`device` is a non-owning pointer.
+    ///@param device a non-owning pointer to the device.
+    ///@param file_path path to the input texture to initialise to an SRV.
     JumpFloodResources(ID3D11Device* device, const std::wstring& file_path);
 
     ///Returns a weak pointer to the input SRV.
@@ -35,12 +37,14 @@ public:
     ///Creates the UAV for the output voronoi diagram. This is a Texture2D of same width and height as the input SRV,
     ///with R32G32B32A32_Float format.
     ///Returns a weak pointer to the UAV. Ownership is ultimately managed by this object.
-    ID3D11UnorderedAccessView* create_voronoi_uav();
+    ///@param regenerate whether or not to regenerate (and replace) the current voronoi UAV.
+    ID3D11UnorderedAccessView *create_voronoi_uav(bool regenerate = true);
 
     ///Creates the UAV for the output distance transform. This is a Texture2D of same width and height as the input SRV,
     ///with R32_Float format.
     ///Returns a weak pointer to the UAV. Ownership is ultimately managed by this object.
-    ID3D11UnorderedAccessView* create_distance_uav();
+    ///@param regenerate whether or not to regenerate (and replace) the current distance UAV.
+    ID3D11UnorderedAccessView *create_distance_uav(bool regenerate = true);
 
     ///Returns a non-owning pointer to the resource associated with the specified SRV/UAV.
     [[nodiscard]] ID3D11Texture2D* get_texture(RESOURCE_TYPE desired_texture) const;
@@ -51,11 +55,19 @@ public:
     ID3D11Texture2D* create_staging_texture(ID3D11Texture2D* mimic_texture);
 
     ///Creates a constant buffer containing the texture Width and Height to use as a shader constant.
-    ID3D11Buffer* create_const_buffer();
+    ID3D11Buffer* create_const_buffer(bool regenerate = true);
+
+    ID3D11Buffer* update_const_buffer(ID3D11DeviceContext* context, JFA_cbuffer buffer);
+
+    ///gets the local cache of the cbuffer. This is NOT necessarily what is on the GPU.
+    JFA_cbuffer get_local_cbuffer() const;
 
     ///Gets the width and height of the resources. Every resource has the same pixel width and height.
     ///returns {0,0} if the input SRV has not been loaded.
     [[nodiscard]] resolution get_resolution() const;
+
+    ///Returns the number of passes the JFA kernel needs to make for a square texture.
+    [[nodiscard]] size_t num_steps() const;
 
 private:
 
@@ -118,6 +130,7 @@ private:
     ComPtr<ID3D11Texture2D> staging_texture = nullptr;
 
     ComPtr<ID3D11Buffer> const_buffer = nullptr;
+    JFA_cbuffer local_buffer = {0};
 
 };
 

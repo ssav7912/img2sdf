@@ -13,10 +13,12 @@
 #include "dxutils.h"
 #include "WICTextureWriter.h"
 #include "JumpFloodResources.h"
+#include "JumpFloodDispatch.h"
 
 //HLSL bytecode includes
-#include "jumpflood.hcs"
-#include "preprocess.hcs"
+#include "shaders/jumpflood.hcs"
+#include "shaders/preprocess.hcs"
+#include "shaders/voronoi_normalise.hcs"
 
 using namespace Microsoft::WRL;
 
@@ -73,6 +75,10 @@ int main(int32_t argc, const char** argv)
         return -1;
     }
 
+    ComPtr<ID3D11ComputeShader> voronoi_normalise_shader;
+    hr = dxinit::device->CreateComputeShader(g_voronoi_normalise, sizeof(g_voronoi_normalise), nullptr, &voronoi_normalise_shader);
+
+
     //create input texture
     auto texture_name = program_parser.get(parsing::INPUT_ARGUMENT);
     auto absolute_texture_path = std::filesystem::absolute({texture_name});
@@ -81,12 +87,11 @@ int main(int32_t argc, const char** argv)
 
     ID3D11ShaderResourceView* in_srv = jfa_resources.get_input_srv();
 
-
     //create output UAV.
-    ID3D11UnorderedAccessView* voronoi_uav = jfa_resources.create_voronoi_uav();
+    ID3D11UnorderedAccessView* voronoi_uav = jfa_resources.create_voronoi_uav(false);
 
     //create distance UAV.
-    ID3D11UnorderedAccessView* distance_uav = jfa_resources.create_distance_uav();
+    ID3D11UnorderedAccessView* distance_uav = jfa_resources.create_distance_uav(false);
 
     //get resource for staging texture.
     ComPtr<ID3D11Texture2D> distance_texture = nullptr;
@@ -106,48 +111,62 @@ int main(int32_t argc, const char** argv)
     ID3D11Buffer* const_buffer = jfa_resources.create_const_buffer();
 
     //create staging texture for CPU read.
-    ID3D11Texture2D* CPU_read_texture = jfa_resources.create_staging_texture(distance_texture.Get());
+    ID3D11Texture2D* voronoi_texture = jfa_resources.get_texture(RESOURCE_TYPE::VORONOI_UAV);
+    ID3D11Texture2D* CPU_read_texture = jfa_resources.create_staging_texture(voronoi_texture);
 
     const size_t Width = jfa_resources.get_resolution().width;
     const size_t Height = jfa_resources.get_resolution().height;
-    const uint32_t num_groups_x = Width/8;
-    const uint32_t num_groups_y = Height/8;
+
+    jump_flood_shaders shaders {
+        .preprocess = g_preprocess,
+        .preprocess_size = sizeof(g_preprocess),
+
+        .voronoi = g_main,
+        .voronoi_size = sizeof(g_main),
+
+        .voronoi_normalise = g_voronoi_normalise,
+        .voronoi_normalise_size = sizeof(g_voronoi_normalise),
+
+    };
+
+    //dispatcher probably shouldn't also be compiling.
+    JumpFloodDispatch dispatcher {dxinit::device.Get(), dxinit::context.Get(), shaders, &jfa_resources};
 
     printf("Running Preprocess Compute Shader\n");
-    {
-        ID3D11UnorderedAccessView* UAV = voronoi_uav;
-        dxinit::run_compute_shader(dxinit::context.Get(), preprocess_shader.Get(), 1, &in_srv,
-                                   const_buffer, nullptr, 0, UAV, 1, num_groups_x, num_groups_y, 1);
+    dispatcher.dispatch_preprocess_shader();
 
-    }
 
     printf("Running Voronoi Compute Shader\n");
+    dispatcher.dispatch_voronoi_shader();
 
-    ID3D11UnorderedAccessView* UAVs[] = {voronoi_uav, distance_uav};
-    constexpr size_t num_uavs = sizeof(UAVs)/sizeof(UAVs[0]);
-    dxinit::run_compute_shader(dxinit::context.Get(), jumpflood_shader.Get(), 1, &in_srv,
-                               const_buffer, nullptr, 0, UAVs, num_uavs, num_groups_x, num_groups_y, 1);
 
+    printf("Running Distance Transform Compute Shader\n");
+
+    dispatcher.dispatch_distance_transform_shader();
+
+    printf("DEBUG: Running voronoi normalise\n");
+    dispatcher.dispatch_voronoi_normalise_shader();
 
     //copy the finished texture into our staging texture.
-    dxinit::context->CopyResource(CPU_read_texture, distance_texture.Get());
+    dxinit::context->CopyResource(CPU_read_texture, voronoi_texture);
 
     D3D11_MAPPED_SUBRESOURCE mapped_resource;
 //
-    std::vector<float> out_data (Width * Height, 0.0f);
+    std::vector<float4> out_data (Width * Height, {0});
     HRESULT map_hr = dxinit::context->Map(CPU_read_texture, 0, D3D11_MAP_READ, 0, &mapped_resource);
 
     if (SUCCEEDED(map_hr)){
         WICTextureWriter writer {};
-        dxutils::copy_to_buffer(mapped_resource.pData, Height, mapped_resource.RowPitch, sizeof(float)*Width, out_data.data());
+        dxutils::copy_to_buffer(mapped_resource.pData, Height, mapped_resource.RowPitch, sizeof(float4)*Width, out_data.data());
 
 
         printf("Finished shader. Writing Output File.\n");
 
-        WICPixelFormatGUID format = GUID_WICPixelFormat32bppGrayFloat;
+        const WICPixelFormatGUID resource_format = GUID_WICPixelFormat128bppRGBAFloat;
+        const WICPixelFormatGUID output_format = GUID_WICPixelFormat32bppRGBA;
         auto output_file = program_parser.get(parsing::OUTPUT_ARGUMENT);
         HRESULT out_result = writer.write_texture(output_file, Width, Height, mapped_resource.RowPitch,
-                             mapped_resource.RowPitch * Height, format, GUID_WICPixelFormat16bppGray,  mapped_resource.pData);
+                             mapped_resource.RowPitch * Height, resource_format, output_format,  mapped_resource.pData);
 
         //write texture
         if (FAILED(out_result))

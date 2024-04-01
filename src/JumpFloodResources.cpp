@@ -4,6 +4,7 @@
 
 #include "JumpFloodResources.h"
 #include <stdexcept>
+#include <format>
 
 JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::wstring& file_path) :
         device(device)
@@ -49,7 +50,11 @@ ID3D11ShaderResourceView *JumpFloodResources::create_input_srv(std::wstring file
     return this->preprocess_srv.Get();
 }
 
-ID3D11UnorderedAccessView *JumpFloodResources::create_voronoi_uav() {
+ID3D11UnorderedAccessView *JumpFloodResources::create_voronoi_uav(bool regenerate) {
+    if (this->voronoi_uav != nullptr && !regenerate)
+    {
+        return this->voronoi_uav.Get();
+    }
 
     try {
         auto voronoi = create_uav<float4>(DXGI_FORMAT_R32G32B32A32_FLOAT);
@@ -62,11 +67,17 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_voronoi_uav() {
     {
         auto eptr = std::current_exception();
         std::rethrow_exception(eptr);
+        return nullptr;
     }
 
 }
 
-ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav() {
+ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav(bool regenerate) {
+    if (this->distance_uav != nullptr && !regenerate)
+    {
+        return this->distance_uav.Get();
+    }
+
     try {
         auto distance = create_uav<float>(DXGI_FORMAT_R32_FLOAT);
         this->distance_texture = distance.first;
@@ -78,6 +89,7 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav() {
     {
         auto eptr = std::current_exception();
         std::rethrow_exception(eptr);
+        return nullptr;
     }
 }
 
@@ -95,6 +107,7 @@ ID3D11Texture2D* JumpFloodResources::create_staging_texture(ID3D11Texture2D* mim
     if (FAILED(out_staging))
     {
         throw std::runtime_error(std::format("Could not create staging texture. HRESULT {:x}\n", out_staging));
+        return nullptr;
     }
     this->staging_texture = CPU_read_texture;
     return this->staging_texture.Get();
@@ -108,15 +121,21 @@ ID3D11ShaderResourceView *JumpFloodResources::get_input_srv() {
     return this->preprocess_srv.Get();
 }
 
-ID3D11Buffer *JumpFloodResources::create_const_buffer() {
+ID3D11Buffer *JumpFloodResources::create_const_buffer(bool regenerate) {
+    if (this->const_buffer != nullptr && !regenerate)
+    {
+        return this->const_buffer.Get();
+    }
+
     const auto width_float = static_cast<float>(res.width);
     const auto height_float = static_cast<float>(res.height);
-    const JFA_cbuffer cbuffer = {width_float, height_float, 0};
+    const JFA_cbuffer cbuffer = {width_float, height_float, 0, 0, 0};
 
     D3D11_BUFFER_DESC desc {0};
     desc.ByteWidth = sizeof(cbuffer);
-    desc.Usage = D3D11_USAGE_IMMUTABLE;
+    desc.Usage = D3D11_USAGE_DYNAMIC;
     desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     D3D11_SUBRESOURCE_DATA resource {};
     resource.pSysMem = &cbuffer;
@@ -127,8 +146,10 @@ ID3D11Buffer *JumpFloodResources::create_const_buffer() {
     if (FAILED(r))
     {
         throw std::runtime_error(std::format("Could not create const buffer for shader constants. HRESULT: {:x} \n",r));
+        return nullptr;
     }
 
+    this->local_buffer = cbuffer;
     return this->const_buffer.Get();
 
 }
@@ -142,4 +163,30 @@ ID3D11Texture2D *JumpFloodResources::get_texture(RESOURCE_TYPE desired_texture) 
         case RESOURCE_TYPE::VORONOI_UAV: {return this->voronoi_texture.Get();};
         default: return nullptr;
     }
+}
+
+size_t JumpFloodResources::num_steps() const {
+    return floor(log2(static_cast<double>(res.width)));
+}
+
+ID3D11Buffer *JumpFloodResources::update_const_buffer(ID3D11DeviceContext* context, JFA_cbuffer buffer) {
+    D3D11_MAPPED_SUBRESOURCE mapped_resource;
+
+    HRESULT hr = context->Map(this->const_buffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
+    if (FAILED(hr))
+    {
+        throw std::runtime_error(std::format("Could not map constant buffer for updating. HRESULT: {:x}", hr));
+        return nullptr;
+    }
+
+    std::memcpy(mapped_resource.pData, &buffer, sizeof(buffer));
+    this->local_buffer = buffer;
+
+    context->Unmap(this->const_buffer.Get(), 0);
+
+    return this->const_buffer.Get();
+}
+
+JFA_cbuffer JumpFloodResources::get_local_cbuffer() const {
+    return this->local_buffer;
 }

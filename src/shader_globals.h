@@ -30,15 +30,22 @@ static_assert(sizeof(float4) == sizeof(float)*4, "Size of float4 struct does not
 
 
 #pragma pack(16)
-struct JFA_cbuffer
+struct alignas(16) JFA_cbuffer
 {
+    //common
     float Width;
     float Height;
-    const uint8_t Padding[16-2*sizeof(float)];
+
+    //voronoi dispatch
+    int32_t Iteration;
+
+    //normalise function
+    float Minimum;
+    float Maximum;
 };
 
 #pragma pack(16)
-struct normalise_cbuffer
+struct alignas(16) normalise_cbuffer
 {
     float minimum;
     float maximum;
