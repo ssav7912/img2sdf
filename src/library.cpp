@@ -19,6 +19,9 @@
 #include "shaders/jumpflood.hcs"
 #include "shaders/preprocess.hcs"
 #include "shaders/voronoi_normalise.hcs"
+#include "shaders/distance.hcs"
+#include "shaders/minmax_reduce.hcs"
+#include "shaders/minmaxreduce_firstpass.hcs"
 
 using namespace Microsoft::WRL;
 
@@ -56,29 +59,6 @@ int main(int32_t argc, const char** argv)
         return 1;
     }
 
-
-    //create shaders.
-    ComPtr<ID3D11ComputeShader> jumpflood_shader;
-    hr = dxinit::device->CreateComputeShader(g_main, sizeof(g_main), nullptr, &jumpflood_shader);
-    if (FAILED(hr))
-    {
-        printf("Failed to create jump flood shader from compiled byte code.");
-        return -1;
-
-    }
-
-    ComPtr<ID3D11ComputeShader> preprocess_shader;
-    hr = dxinit::device->CreateComputeShader(g_preprocess, sizeof(g_preprocess), nullptr, &preprocess_shader);
-    if (FAILED(hr))
-    {
-        printf("Failed to create preprocess shader from compiled bytecode.\n");
-        return -1;
-    }
-
-    ComPtr<ID3D11ComputeShader> voronoi_normalise_shader;
-    hr = dxinit::device->CreateComputeShader(g_voronoi_normalise, sizeof(g_voronoi_normalise), nullptr, &voronoi_normalise_shader);
-
-
     //create input texture
     auto texture_name = program_parser.get(parsing::INPUT_ARGUMENT);
     auto absolute_texture_path = std::filesystem::absolute({texture_name});
@@ -114,6 +94,9 @@ int main(int32_t argc, const char** argv)
     ID3D11Texture2D* voronoi_texture = jfa_resources.get_texture(RESOURCE_TYPE::VORONOI_UAV);
     ID3D11Texture2D* CPU_read_texture = jfa_resources.create_staging_texture(voronoi_texture);
 
+    ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
+    ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
+
     const size_t Width = jfa_resources.get_resolution().width;
     const size_t Height = jfa_resources.get_resolution().height;
 
@@ -126,6 +109,16 @@ int main(int32_t argc, const char** argv)
 
         .voronoi_normalise = g_voronoi_normalise,
         .voronoi_normalise_size = sizeof(g_voronoi_normalise),
+
+        .distance_transform = g_distance,
+        .distance_transform_size = sizeof(g_distance),
+
+        .min_max_reduce = g_reduce,
+        .min_max_reduce_size = sizeof(g_reduce),
+
+        .min_max_reduce_firstpass = g_reduce_firstpass,
+        .min_max_reduce_firstpass_size = sizeof(g_reduce_firstpass)
+
 
     };
 
@@ -147,6 +140,9 @@ int main(int32_t argc, const char** argv)
     printf("DEBUG: Running voronoi normalise\n");
     dispatcher.dispatch_voronoi_normalise_shader();
 
+    printf("Running Min Max Reduction\n");
+    dispatcher.dispatch_minmax_reduce_shader();
+
     //copy the finished texture into our staging texture.
     dxinit::context->CopyResource(CPU_read_texture, voronoi_texture);
 
@@ -154,6 +150,8 @@ int main(int32_t argc, const char** argv)
 //
     std::vector<float4> out_data (Width * Height, {0});
     HRESULT map_hr = dxinit::context->Map(CPU_read_texture, 0, D3D11_MAP_READ, 0, &mapped_resource);
+
+    auto out_minmax = dxutils::copy_to_staging<float2>(dxinit::context.Get(), reduce_staging, reduce_texture);
 
     if (SUCCEEDED(map_hr)){
         WICTextureWriter writer {};

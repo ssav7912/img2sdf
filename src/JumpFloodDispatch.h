@@ -30,6 +30,9 @@ struct jump_flood_shaders
     const uint8_t* distance_transform;
     size_t distance_transform_size;
 
+    const uint8_t* min_max_reduce_firstpass;
+    size_t min_max_reduce_firstpass_size;
+
     ///pointer to the min_max reduction shader bytecode
     const uint8_t* min_max_reduce;
     size_t min_max_reduce_size;
@@ -46,6 +49,7 @@ enum class SHADERS
     VORONOI,
     VORONOI_NORMALISE,
     DISTANCE,
+    MINMAXREDUCE_FIRST,
     MINMAXREDUCE,
     DISTANCE_NORMALISE
 };
@@ -72,8 +76,11 @@ public:
     ///dispatches the voronoi normalisation shader.
     void dispatch_voronoi_normalise_shader();
 
+    void dispatch_minmax_reduce_shader();
 
 private:
+    constexpr static size_t threads_per_group_width = 8;
+
     ID3D11Device* device = nullptr;
     ID3D11DeviceContext* context = nullptr;
     class JumpFloodResources* resources = nullptr;
@@ -82,6 +89,7 @@ private:
     ComPtr<ID3D11ComputeShader> voronoi_shader = nullptr;
     ComPtr<ID3D11ComputeShader> voronoi_normalise_shader = nullptr;
     ComPtr<ID3D11ComputeShader> distance_transform_shader = nullptr;
+    ComPtr<ID3D11ComputeShader> min_max_reduce_firstpass_shader = nullptr;
     ComPtr<ID3D11ComputeShader> min_max_reduce_shader = nullptr;
     ComPtr<ID3D11ComputeShader> distance_normalise_shader = nullptr;
 

@@ -5,6 +5,9 @@
 #include "JumpFloodResources.h"
 #include <stdexcept>
 #include <format>
+#include <limits>
+#include <vector>
+#include "jumpflooderror.h"
 
 JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::wstring& file_path) :
         device(device)
@@ -161,6 +164,7 @@ ID3D11Texture2D *JumpFloodResources::get_texture(RESOURCE_TYPE desired_texture) 
         case RESOURCE_TYPE::INPUT_SRV: {return this->preprocess_texture.Get();};
         case RESOURCE_TYPE::STAGING_TEXTURE: {return this->staging_texture.Get();};
         case RESOURCE_TYPE::VORONOI_UAV: {return this->voronoi_texture.Get();};
+        case RESOURCE_TYPE::REDUCE_UAV: {return this->reduce_texture.Get();};
         default: return nullptr;
     }
 }
@@ -189,4 +193,53 @@ ID3D11Buffer *JumpFloodResources::update_const_buffer(ID3D11DeviceContext* conte
 
 JFA_cbuffer JumpFloodResources::get_local_cbuffer() const {
     return this->local_buffer;
+}
+
+ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_groups_x, size_t num_groups_y) {
+
+    D3D11_TEXTURE2D_DESC desc;
+    desc.Width = num_groups_x;
+    desc.Height = num_groups_y;
+    desc.Format = DXGI_FORMAT_R32G32_FLOAT;
+    desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.ArraySize = 1;
+    desc.MipLevels = 1;
+    desc.CPUAccessFlags = 0;
+
+
+    constexpr float inf = std::numeric_limits<float>::infinity();
+    const std::vector<float2> init_minmax (num_groups_x * num_groups_y, float2{inf, -inf});
+    D3D11_SUBRESOURCE_DATA data;
+    data.pSysMem = init_minmax.data();
+    data.SysMemPitch = 0;
+    data.SysMemSlicePitch = 0;
+
+
+    HRESULT out_reduction = device->CreateTexture2D(&desc, &data, this->reduce_texture.GetAddressOf());
+    if (FAILED(out_reduction))
+    {
+        throw jumpflood_error(out_reduction, "Could not create output buffer for minmax reduction.");
+    }
+
+    HRESULT out_uav = device->CreateUnorderedAccessView(this->reduce_texture.Get(), nullptr, this->reduce_uav.GetAddressOf());
+    if (FAILED(out_uav))
+    {
+        throw jumpflood_error(out_uav, "Could not create output UAV for minmax reduction.");
+    }
+
+    return this->reduce_uav.Get();
+
+}
+
+ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view() {
+
+
+    HRESULT srv = device->CreateShaderResourceView(this->distance_texture.Get(), nullptr, this->reduce_input_srv.GetAddressOf());
+    if (FAILED(srv))
+    {
+        throw jumpflood_error(srv, "Could not create input SRV for minmax reduction.");
+    }
+
+    return this->reduce_input_srv.Get();
 }

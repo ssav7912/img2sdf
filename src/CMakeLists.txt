@@ -13,7 +13,8 @@ LIST(APPEND CMAKE_PROGRAM_PATH  "C:\\Program Files\\Microsoft Visual Studio\\202
 #Build HLSL
 add_custom_target(shaders COMMENT "Shader Compilation")
 
-set(HLSL_SHADER_FILES jumpflood.hlsl preprocess.hlsl distance.hlsl voronoi_normalise.hlsl)
+set(HLSL_SHADER_FILES jumpflood.hlsl preprocess.hlsl distance.hlsl voronoi_normalise.hlsl
+        minmax_reduce.hlsl minmaxreduce_firstpass.hlsl)
 set_source_files_properties(jumpflood.hlsl PROPERTIES ShaderType "cs")
 set_source_files_properties(jumpflood.hlsl PROPERTIES EntryPoint "main")
 
@@ -25,6 +26,12 @@ set_source_files_properties(distance.hlsl PROPERTIES EntryPoint "distance")
 
 set_source_files_properties(voronoi_normalise.hlsl PROPERTIES ShaderType "cs")
 set_source_files_properties(voronoi_normalise.hlsl PROPERTIES EntryPoint "voronoi_normalise")
+
+set_source_files_properties(minmax_reduce.hlsl PROPERTIES ShaderType "cs")
+set_source_files_properties(minmax_reduce.hlsl PROPERTIES EntryPoint "reduce")
+
+set_source_files_properties(minmaxreduce_firstpass.hlsl PROPERTIES ShaderType "cs")
+set_source_files_properties(minmaxreduce_firstpass.hlsl PROPERTIES EntryPoint "reduce_firstpass")
 
 set_source_files_properties(${HLSL_SHADER_FILES} PROPERTIES ShaderModel "5_0")
 

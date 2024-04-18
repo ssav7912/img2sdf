@@ -6,6 +6,7 @@ cbuffer minmax : register(b0) {
     float maximum;
 }
 
+///Remaps input linearly. Used to normalise distance based on computed minmax.
 [numthreads(8,8,1)]
 void main(uint3 DispatchThreadId : SV_DispatchThreadID)
 {

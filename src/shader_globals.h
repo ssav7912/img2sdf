@@ -28,6 +28,14 @@ struct float4
 };
 static_assert(sizeof(float4) == sizeof(float)*4, "Size of float4 struct does not conform to HLSL float4 size!");
 
+#pragma pack()
+struct float2
+{
+    float x = 0;
+    float y = 0;
+};
+
+static_assert(sizeof(float2) == sizeof(float)*2, "Siez of float 2 struct does not conform to HLSL float2 size!");
 
 #pragma pack(16)
 struct alignas(16) JFA_cbuffer

@@ -93,8 +93,8 @@ ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
 
 void
 JumpFloodDispatch::dispatch_preprocess_shader() {
-    const uint32_t num_groups_x = resources->get_resolution().width / 8;
-    const uint32_t num_groups_y = resources->get_resolution().height / 8;
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
     auto srv = resources->get_input_srv();
     auto cbuffer = resources->create_const_buffer(false);
@@ -107,8 +107,8 @@ JumpFloodDispatch::dispatch_preprocess_shader() {
 void JumpFloodDispatch::dispatch_voronoi_shader() {
 
     const size_t num_steps = resources->num_steps();
-    const uint32_t num_groups_x = resources->get_resolution().width / 8;
-    const uint32_t num_groups_y = resources->get_resolution().height / 8;
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
 
     auto cbuffer = resources->create_const_buffer(false);
@@ -130,8 +130,8 @@ void JumpFloodDispatch::dispatch_voronoi_shader() {
 
 void JumpFloodDispatch::dispatch_voronoi_normalise_shader() {
     const size_t num_steps = resources->num_steps();
-    const uint32_t num_groups_x = resources->get_resolution().width / 8;
-    const uint32_t num_groups_y = resources->get_resolution().height / 8;
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
     auto cbuffer = resources->create_const_buffer(false);
     auto voronoi_uav = resources->create_voronoi_uav(false);
@@ -143,8 +143,8 @@ void JumpFloodDispatch::dispatch_voronoi_normalise_shader() {
 
 void JumpFloodDispatch::dispatch_distance_transform_shader() {
 
-    const uint32_t num_groups_x = resources->get_resolution().width / 8;
-    const uint32_t num_groups_y = resources->get_resolution().height / 8;
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
     auto cbuffer = resources->create_const_buffer(false);
     auto voronoi_uav = resources->create_voronoi_uav(false);
@@ -155,6 +155,29 @@ void JumpFloodDispatch::dispatch_distance_transform_shader() {
     dxinit::run_compute_shader(context, distance_transform_shader.Get(), 0, nullptr,
                                cbuffer, nullptr, 0, UAVs, 2, num_groups_x, num_groups_y, 1);
 
+}
+
+void JumpFloodDispatch::dispatch_minmax_reduce_shader() {
+    uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
+
+    auto srv = resources->create_reduction_view();
+    auto uav = resources->create_reduction_uav(num_groups_x, num_groups_y);
+
+    //run the first pass, 'seeding' the reduction with the minmax from the input SRV.
+    dxinit::run_compute_shader(context, this->min_max_reduce_firstpass_shader.Get(), 1, &srv, nullptr, nullptr,
+                               0, &uav, 1, num_groups_x, num_groups_y, 1);
+
+    //recursively reduce, dropping the number of groups by half each time. Eventually UAV[0,0] will
+    //store the final min-max.
+    while (num_groups_x > 1u && num_groups_y > 1u)
+    {
+        num_groups_x = std::max(1u, num_groups_x / 2);
+        num_groups_y = std::max(1u, num_groups_y / 2);
+
+        dxinit::run_compute_shader(context, this->min_max_reduce_shader.Get(), 0, nullptr, nullptr ,
+                                   nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
+    }
 }
 
 

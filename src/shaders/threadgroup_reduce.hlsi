@@ -1,0 +1,70 @@
+
+
+void thread_group_minmax(inout float2 group_mem[8*8], uint group_thread_id_1d)
+{
+        //wastes most threads in the warp...
+        if (group_thread_id_1d < 32)
+        {
+            float minimum = min(group_mem[8-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[64-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        if (group_thread_id_1d < 16)
+        {
+            float minimum = min(group_mem[32-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[32-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+
+
+        if (group_thread_id_1d < 8)
+        {
+            float minimum = min(group_mem[16-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[16-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+
+
+        GroupMemoryBarrierWithGroupSync();
+
+
+        if (group_thread_id_1d < 4)
+        {
+            float minimum = min(group_mem[8-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[8-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+
+
+        if (group_thread_id_1d < 2)
+        {
+            float minimum = min(group_mem[4-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[4-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+
+        if (group_thread_id_1d < 1)
+        {
+            float minimum = min(group_mem[2-group_thread_id_1d].x, group_mem[group_thread_id_1d].x);
+            float maximum = max(group_mem[2-group_thread_id_1d].y, group_mem[group_thread_id_1d].y);
+
+            group_mem[group_thread_id_1d] = float2(minimum, maximum);
+
+        }
+}

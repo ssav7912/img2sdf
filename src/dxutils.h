@@ -9,7 +9,9 @@
 #include <wrl.h>
 #include <d3d11.h>
 #include <string>
+#include <vector>
 
+#include <stdexcept>
 
 namespace dxutils
 {
@@ -21,6 +23,29 @@ namespace dxutils
     void copy_to_buffer(const void* in_buffer, size_t buffer_height, size_t stride, size_t bytes_per_row, void* out_buffer);
 
     std::pair<ComPtr<ID3D11Resource>, ComPtr<ID3D11ShaderResourceView>> load_texture_to_srv(const std::wstring &texture_path, ID3D11Device* device);
+
+    std::pair<float, float> serial_min_max(std::vector<float> array);
+
+    template<typename data_type>
+    std::vector<data_type> copy_to_staging(ID3D11DeviceContext* context, ID3D11Texture2D* staging_texture, ID3D11Texture2D* texture)
+    {
+        context->CopyResource(staging_texture, texture);
+        D3D11_MAPPED_SUBRESOURCE resource;
+
+        D3D11_TEXTURE2D_DESC desc;
+        staging_texture->GetDesc(&desc);
+
+        std::vector<data_type> out_data {desc.Width * desc.Height, {0}};
+        HRESULT map_hr = context->Map(staging_texture, 0, D3D11_MAP_READ, 0, &resource);
+        if (FAILED(map_hr))
+        {
+            throw std::runtime_error("Could not map staging texture.");
+        }
+
+        dxutils::copy_to_buffer(resource.pData, desc.Height, resource.RowPitch, sizeof(data_type)*desc.Width, out_data.data());
+
+        return out_data;
+    }
 
 }
 

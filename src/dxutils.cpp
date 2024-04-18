@@ -5,7 +5,7 @@
 #include "dxutils.h"
 #include <algorithm>
 #include "WICTextureLoader.h"
-
+#include <limits>
 
 void dxutils::copy_to_buffer(const void *in_buffer, size_t buffer_height, size_t stride, size_t bytes_per_row, void *out_buffer) {
 
@@ -35,4 +35,17 @@ std::pair<dxutils::ComPtr<ID3D11Resource>, dxutils::ComPtr<ID3D11ShaderResourceV
     return {resource, view};
 
 
+}
+
+std::pair<float, float> dxutils::serial_min_max(std::vector<float> array) {
+    float minimum = std::numeric_limits<float>::infinity();
+    float maximum = -std::numeric_limits<float>::infinity();
+
+    for (const auto value : array)
+    {
+        minimum = std::min(minimum, value);
+        maximum = std::max(maximum, value);
+    }
+
+    return {minimum, maximum};
 }

@@ -19,6 +19,7 @@ enum class RESOURCE_TYPE
     INPUT_SRV,
     VORONOI_UAV,
     DISTANCE_UAV,
+    REDUCE_UAV,
     STAGING_TEXTURE,
 };
 
@@ -61,6 +62,10 @@ public:
 
     ///gets the local cache of the cbuffer. This is NOT necessarily what is on the GPU.
     JFA_cbuffer get_local_cbuffer() const;
+
+    ID3D11ShaderResourceView* create_reduction_view();
+
+    ID3D11UnorderedAccessView* create_reduction_uav(size_t num_groups_x, size_t num_groups_y);
 
     ///Gets the width and height of the resources. Every resource has the same pixel width and height.
     ///returns {0,0} if the input SRV has not been loaded.
@@ -126,6 +131,10 @@ private:
 
     ComPtr<ID3D11UnorderedAccessView> distance_uav = nullptr;
     ComPtr<ID3D11Texture2D> distance_texture = nullptr;
+
+    ComPtr<ID3D11ShaderResourceView> reduce_input_srv = nullptr;
+    ComPtr<ID3D11UnorderedAccessView> reduce_uav = nullptr;
+    ComPtr<ID3D11Texture2D> reduce_texture = nullptr;
 
     ComPtr<ID3D11Texture2D> staging_texture = nullptr;
 
