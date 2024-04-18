@@ -82,7 +82,7 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav(bool regenera
     }
 
     try {
-        auto distance = create_uav<float>(DXGI_FORMAT_R32_FLOAT);
+        auto distance = create_uav<float>(DXGI_FORMAT_R32_FLOAT, D3D11_BIND_SHADER_RESOURCE);
         this->distance_texture = distance.first;
         this->distance_uav = distance.second;
 
@@ -195,9 +195,12 @@ JFA_cbuffer JumpFloodResources::get_local_cbuffer() const {
     return this->local_buffer;
 }
 
-ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_groups_x, size_t num_groups_y) {
-
-    D3D11_TEXTURE2D_DESC desc;
+ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_groups_x, size_t num_groups_y, bool regenerate) {
+    if (this->reduce_uav != nullptr && !regenerate)
+    {
+        return this->reduce_uav.Get();
+    }
+    D3D11_TEXTURE2D_DESC desc = input_description;
     desc.Width = num_groups_x;
     desc.Height = num_groups_y;
     desc.Format = DXGI_FORMAT_R32G32_FLOAT;
@@ -210,9 +213,9 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_g
 
     constexpr float inf = std::numeric_limits<float>::infinity();
     const std::vector<float2> init_minmax (num_groups_x * num_groups_y, float2{inf, -inf});
-    D3D11_SUBRESOURCE_DATA data;
+    D3D11_SUBRESOURCE_DATA data = {nullptr};
     data.pSysMem = init_minmax.data();
-    data.SysMemPitch = 0;
+    data.SysMemPitch = sizeof(float2) * desc.Width;
     data.SysMemSlicePitch = 0;
 
 
@@ -232,7 +235,11 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_g
 
 }
 
-ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view() {
+ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view(bool regenerate) {
+    if (this->reduce_input_srv != nullptr && !regenerate)
+    {
+        return this->reduce_input_srv.Get();
+    }
 
 
     HRESULT srv = device->CreateShaderResourceView(this->distance_texture.Get(), nullptr, this->reduce_input_srv.GetAddressOf());

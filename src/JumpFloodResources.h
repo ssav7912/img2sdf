@@ -63,9 +63,9 @@ public:
     ///gets the local cache of the cbuffer. This is NOT necessarily what is on the GPU.
     JFA_cbuffer get_local_cbuffer() const;
 
-    ID3D11ShaderResourceView* create_reduction_view();
+    ID3D11ShaderResourceView* create_reduction_view(bool regenerate = true);
 
-    ID3D11UnorderedAccessView* create_reduction_uav(size_t num_groups_x, size_t num_groups_y);
+    ID3D11UnorderedAccessView* create_reduction_uav(size_t num_groups_x, size_t num_groups_y, bool regenerate = true);
 
     ///Gets the width and height of the resources. Every resource has the same pixel width and height.
     ///returns {0,0} if the input SRV has not been loaded.
@@ -80,13 +80,13 @@ private:
     ///Requires that `input_description` has been set, i.e. that the input SRV has been loaded.
     ///may throw a std::runtime_error if UAV or texture creation fails.
     template <typename format_type>
-    std::pair<ComPtr<ID3D11Texture2D>, ComPtr<ID3D11UnorderedAccessView>> create_uav(DXGI_FORMAT format)
+    std::pair<ComPtr<ID3D11Texture2D>, ComPtr<ID3D11UnorderedAccessView>> create_uav(DXGI_FORMAT format, D3D11_BIND_FLAG optional_bind_flags = D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS)
     {
 
         D3D11_TEXTURE2D_DESC desc = input_description;
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.Format = format;
-        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+        desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | optional_bind_flags;
         desc.MiscFlags = 0;
 
         ComPtr<ID3D11Texture2D> uav_texture = nullptr;

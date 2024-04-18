@@ -24,8 +24,13 @@ namespace dxutils
 
     std::pair<ComPtr<ID3D11Resource>, ComPtr<ID3D11ShaderResourceView>> load_texture_to_srv(const std::wstring &texture_path, ID3D11Device* device);
 
+    ///Serial (pixel-by-pixel) implementation of min/max statistic calculator for an array.
+    ///Used as a ground-truth reference for the parallel reduce minmax.
     std::pair<float, float> serial_min_max(std::vector<float> array);
 
+
+    ///maps a D3D11Texture to a staging resource, and then copies it out to a vector with the specified template type.
+    ///Accounts for stride & padding in the texture.
     template<typename data_type>
     std::vector<data_type> copy_to_staging(ID3D11DeviceContext* context, ID3D11Texture2D* staging_texture, ID3D11Texture2D* texture)
     {
@@ -35,7 +40,7 @@ namespace dxutils
         D3D11_TEXTURE2D_DESC desc;
         staging_texture->GetDesc(&desc);
 
-        std::vector<data_type> out_data {desc.Width * desc.Height, {0}};
+        std::vector<data_type> out_data(desc.Width * desc.Height, {0});
         HRESULT map_hr = context->Map(staging_texture, 0, D3D11_MAP_READ, 0, &resource);
         if (FAILED(map_hr))
         {
