@@ -24,6 +24,8 @@ void reduce_firstpass(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupID
     if (mem_index == 0)
     {
         Reduce[groupID.xy] = minmax[mem_index];
+        //Reduce[groupID.xy] = float2(48,32);
+
     }
 
 }

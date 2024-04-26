@@ -5,8 +5,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /DDEBUG /D_DEBUG")
 
 add_compile_definitions("NOMINMAX") #deal with collisions with std::min, std::max
-add_compile_options("/fsanitize=address")
-add_link_options("/fsanitize=address")
+
 LIST(APPEND CMAKE_PROGRAM_PATH  "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.37.32822\\bin\\Hostx64\\x64" ...)
 
 
@@ -69,3 +68,26 @@ add_executable(img2sdf library.cpp
         jumpflooderror.h
 )
 
+target_compile_options(img2sdf PUBLIC "/fsanitize=address")
+target_link_options(img2sdf PUBLIC "/fsanitize=address")
+
+add_library(libimg2sdf STATIC
+        dxinit.cpp
+        dxinit.h
+        WICTextureLoader.cpp
+        WICTextureLoader.h
+        dxutils.cpp
+        dxutils.h
+        shader_globals.h
+        library.h
+        WICTextureWriter.cpp
+        WICTextureWriter.h
+        JumpFloodResources.cpp
+        JumpFloodResources.h
+        JumpFloodDispatch.cpp
+        JumpFloodDispatch.h
+        jumpflooderror.cpp
+        jumpflooderror.h)
+
+
+target_link_libraries(libimg2sdf PRIVATE d3d11.lib d3dcompiler.dll dxguid.lib argparse windowscodecs.lib runtimeobject.lib)

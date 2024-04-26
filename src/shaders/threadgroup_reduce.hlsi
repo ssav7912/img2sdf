@@ -9,8 +9,9 @@ void thread_group_minmax(uint group_thread_id_1d)
         //wastes most threads in the warp...
         if (group_thread_id_1d < 32)
         {
-            float minimum = min(minmax[64-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[64-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            //off-by-one :\
+            float minimum = min(minmax[64-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[64-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 
@@ -19,8 +20,8 @@ void thread_group_minmax(uint group_thread_id_1d)
 
         if (group_thread_id_1d < 16)
         {
-            float minimum = min(minmax[32-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[32-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            float minimum = min(minmax[32-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[32-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 
@@ -31,8 +32,8 @@ void thread_group_minmax(uint group_thread_id_1d)
 
         if (group_thread_id_1d < 8)
         {
-            float minimum = min(minmax[16-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[16-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            float minimum = min(minmax[16-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[16-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 
@@ -44,18 +45,18 @@ void thread_group_minmax(uint group_thread_id_1d)
 
         if (group_thread_id_1d < 4)
         {
-            float minimum = min(minmax[8-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[8-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            float minimum = min(minmax[8-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[8-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 
         }
-
+        GroupMemoryBarrierWithGroupSync();
 
         if (group_thread_id_1d < 2)
         {
-            float minimum = min(minmax[4-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[4-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            float minimum = min(minmax[4-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[4-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 
@@ -65,8 +66,8 @@ void thread_group_minmax(uint group_thread_id_1d)
 
         if (group_thread_id_1d < 1)
         {
-            float minimum = min(minmax[2-group_thread_id_1d].x, minmax[group_thread_id_1d].x);
-            float maximum = max(minmax[2-group_thread_id_1d].y, minmax[group_thread_id_1d].y);
+            float minimum = min(minmax[2-group_thread_id_1d - 1].x, minmax[group_thread_id_1d].x);
+            float maximum = max(minmax[2-group_thread_id_1d - 1].y, minmax[group_thread_id_1d].y);
 
             minmax[group_thread_id_1d] = float2(minimum, maximum);
 

@@ -31,6 +31,8 @@ public:
     ///@param file_path path to the input texture to initialise to an SRV.
     JumpFloodResources(ID3D11Device* device, const std::wstring& file_path);
 
+    JumpFloodResources(ID3D11Device* device, const std::vector<float> data, int32_t width, int32_t height);
+
     ///Returns a weak pointer to the input SRV.
     ///The SRV is into an R32_Float Texture2D.
     ID3D11ShaderResourceView* get_input_srv();

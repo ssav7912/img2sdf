@@ -27,6 +27,54 @@ JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::wstring&
 
         };
 
+
+JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::vector<float> data, int32_t width,
+                                       int32_t height) : device(device) {
+    if (device == nullptr)
+    {
+        throw std::runtime_error("ID3D11Device is NULL");
+    }
+
+    D3D11_TEXTURE2D_DESC srv_description = {0};
+    srv_description.Width = width;
+    srv_description.Height = height;
+    srv_description.Usage = D3D11_USAGE_DEFAULT;
+    srv_description.Format = DXGI_FORMAT_R32_FLOAT;
+    srv_description.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    srv_description.MiscFlags = 0;
+    srv_description.ArraySize = 1;
+    srv_description.MipLevels = 1;
+    srv_description.SampleDesc = {1,0};
+
+    ComPtr<ID3D11Texture2D> srv_texture {};
+
+    D3D11_SUBRESOURCE_DATA subresource = {0};
+    subresource.pSysMem = data.data();
+    subresource.SysMemPitch = sizeof(float) * width;
+    subresource.SysMemSlicePitch = 0;
+
+    HRESULT out_tex = device->CreateTexture2D(&srv_description, &subresource, srv_texture.GetAddressOf());
+    if (FAILED(out_tex))
+    {
+        throw jumpflood_error(out_tex, "Could not create SRV texture from input buffer.");
+    }
+
+    ComPtr<ID3D11ShaderResourceView> srv = nullptr;
+
+    HRESULT out_srv = device->CreateShaderResourceView(srv_texture.Get(), nullptr, srv.GetAddressOf());
+    if (FAILED(out_srv))
+    {
+        throw jumpflood_error(out_tex, "Could not create SRV from input buffer.");
+    }
+
+    this->preprocess_srv = srv;
+    this->preprocess_texture = srv_texture;
+    this->input_description = srv_description;
+    this->res.height = srv_description.Height;
+    this->res.width = srv_description.Width;
+
+}
+
 ID3D11ShaderResourceView *JumpFloodResources::create_input_srv(std::wstring filepath) {
     auto input = dxutils::load_texture_to_srv(filepath, device);
 
@@ -250,3 +298,4 @@ ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view(bool regener
 
     return this->reduce_input_srv.Get();
 }
+

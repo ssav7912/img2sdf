@@ -31,6 +31,8 @@ namespace dxutils
 
     ///maps a D3D11Texture to a staging resource, and then copies it out to a vector with the specified template type.
     ///Accounts for stride & padding in the texture.
+    ///@param staging_texture a staging texture to copy to. Must match the @param texture description, use JumpFloodResources::create_staging_texture to copy.
+    ///@tparam data_type *must* match the width and layout of the DXGI_FORMAT in the @param texture and @param staging_texture
     template<typename data_type>
     std::vector<data_type> copy_to_staging(ID3D11DeviceContext* context, ID3D11Texture2D* staging_texture, ID3D11Texture2D* texture)
     {

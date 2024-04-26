@@ -6,6 +6,7 @@
 #include "JumpFloodResources.h"
 #include "dxinit.h"
 #include <stdexcept>
+#include <cassert>
 
 JumpFloodDispatch::JumpFloodDispatch(ID3D11Device *device, ID3D11DeviceContext *context, jump_flood_shaders byte_code,
                                      JumpFloodResources* resources) :
@@ -57,6 +58,15 @@ device(device), context(context), resources(resources) {
             throw jumpflood_error(hr, "Could not create distance transform shader. ");
         }
     }
+    if (byte_code.min_max_reduce_firstpass != nullptr)
+    {
+        hr = device->CreateComputeShader(byte_code.min_max_reduce_firstpass, byte_code.min_max_reduce_firstpass_size, nullptr,
+                                         min_max_reduce_firstpass_shader.GetAddressOf());
+        if (FAILED(hr))
+        {
+            throw jumpflood_error(hr, "Could not create min max reduction first pass shader. ");
+        }
+    }
 
     if (byte_code.min_max_reduce != nullptr) {
 
@@ -76,6 +86,7 @@ device(device), context(context), resources(resources) {
             throw jumpflood_error(hr, "Cound not create distance transform shader.");
         }
     }
+
 }
 
 ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
@@ -100,6 +111,7 @@ JumpFloodDispatch::dispatch_preprocess_shader() {
     auto cbuffer = resources->create_const_buffer(false);
     auto uav = resources->create_voronoi_uav(false);
 
+    assert(preprocess_shader);
     dxinit::run_compute_shader(context, preprocess_shader.Get(), 1, &srv,
                                cbuffer, nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
 }
@@ -120,6 +132,7 @@ void JumpFloodDispatch::dispatch_voronoi_shader() {
         local_buf.Iteration = i;
         resources->update_const_buffer(context, local_buf);
 
+        assert(this->voronoi_shader);
         dxinit::run_compute_shader(context, voronoi_shader.Get(), 0,nullptr,
                                    cbuffer, nullptr, 0, &voronoi_uav, 1, num_groups_x, num_groups_y,1);
 
@@ -136,6 +149,7 @@ void JumpFloodDispatch::dispatch_voronoi_normalise_shader() {
     auto cbuffer = resources->create_const_buffer(false);
     auto voronoi_uav = resources->create_voronoi_uav(false);
 
+    assert(this->voronoi_normalise_shader);
     dxinit::run_compute_shader(context, voronoi_normalise_shader.Get(), 0, nullptr,
                                cbuffer, nullptr, 0, &voronoi_uav, 1, num_groups_x, num_groups_y, 1);
 
@@ -152,18 +166,45 @@ void JumpFloodDispatch::dispatch_distance_transform_shader() {
 
     ID3D11UnorderedAccessView* UAVs[] = {voronoi_uav, distance_uav};
 
+    assert(this->distance_transform_shader);
     dxinit::run_compute_shader(context, distance_transform_shader.Get(), 0, nullptr,
                                cbuffer, nullptr, 0, UAVs, 2, num_groups_x, num_groups_y, 1);
 
 }
 
-void JumpFloodDispatch::dispatch_minmax_reduce_shader() {
-    uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
-    uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
+void JumpFloodDispatch::dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv) {
+    uint32_t num_groups_x = 0;
+    uint32_t num_groups_y = 0;
+    if (explicit_srv)
+    {
+        ComPtr<ID3D11Resource> srv_resource;
+        explicit_srv->GetResource(srv_resource.GetAddressOf());
 
-    auto srv = resources->create_reduction_view();
+        ComPtr<ID3D11Texture2D> srv_texture;
+
+        HRESULT resource_result = srv_resource.As<ID3D11Texture2D>(&srv_texture);
+        if (FAILED(resource_result))
+        {
+            throw jumpflood_error(resource_result, "srv_resource was not an ID3D11Texture2D. This should never happen!");
+        }
+
+        D3D11_TEXTURE2D_DESC desc;
+        srv_texture->GetDesc(&desc);
+
+        num_groups_x = desc.Width / threads_per_group_width;
+        num_groups_y = desc.Height / threads_per_group_width;
+    }
+    else {
+        num_groups_x = resources->get_resolution().width / threads_per_group_width;
+        num_groups_y = resources->get_resolution().height / threads_per_group_width;
+    }
+
+    auto srv = explicit_srv == nullptr ? resources->create_reduction_view() : explicit_srv;
     auto uav = resources->create_reduction_uav(num_groups_x, num_groups_y);
 
+
+    assert(this->min_max_reduce_shader);
+    assert(this->min_max_reduce_firstpass_shader);
     //run the first pass, 'seeding' the reduction with the minmax from the input SRV.
     dxinit::run_compute_shader(context, this->min_max_reduce_firstpass_shader.Get(), 1, &srv, nullptr, nullptr,
                                0, &uav, 1, num_groups_x, num_groups_y, 1);
