@@ -80,10 +80,12 @@ public:
     ///returning it in index 0 of the bound UAV.
     ///@param explicit_srv Optional parameter to override the input SRV. By default, uses the output from distance_transform
     ///instantiated in JumpFloodResources. Must be a DXGI_R32_FLOAT with same width and height as the JumpFloodResources pipeline.
-    void dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv = nullptr);
+    ///@returns true if the recursion completed entirely, false if it exited early.
+    ///if the routine returns early, you must iterate on the returned resource to find the final minmax value.
+    [[nodiscard]] bool dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv = nullptr);
 
-private:
     constexpr static size_t threads_per_group_width = 8;
+private:
 
     ID3D11Device* device = nullptr;
     ID3D11DeviceContext* context = nullptr;

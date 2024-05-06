@@ -16,7 +16,9 @@
 namespace {
     using namespace Microsoft::WRL;
 
-    class DXSetup : public testing::Test {
+
+
+class DXSetup : public testing::TestWithParam<int32_t> {
     protected:
     void SetUp() override
     {
@@ -25,7 +27,11 @@ namespace {
                                       context.GetAddressOf(), false));
         debug_layer = dxinit::debug_layer;
 
+        width = GetParam();
+        height = GetParam();
 
+
+        //want same distribution every time.
         std::default_random_engine random_gen = std::default_random_engine {0};
         auto distribution = std::uniform_real_distribution<float> (std::numeric_limits<float>::min(), std::numeric_limits<float>::max());
         std::vector<float> debug (width * height);
@@ -51,8 +57,8 @@ namespace {
 
 
     std::vector<float> debug_image;
-    static constexpr int32_t width = 8;
-    static constexpr int32_t height = 8;
+    int32_t width = 8;
+    int32_t height = 8;
 
     std::optional<JumpFloodResources> jfa_resources;
     std::optional<JumpFloodDispatch> dispatcher;
@@ -62,7 +68,7 @@ namespace {
     ComPtr<ID3D11Debug> debug_layer;
 };
 
-    TEST_F(DXSetup, MinMaxGroundTruth)
+    TEST_P(DXSetup, MinMaxGroundTruth)
 {
 
     auto srv = jfa_resources.value().get_input_srv();
@@ -75,16 +81,15 @@ namespace {
 
     D3D11_TEXTURE2D_DESC srv_desc;
     srv_texture->GetDesc(&srv_desc);
-    ASSERT_EQ(srv_desc.Width, 8);
-    ASSERT_EQ(srv_desc.Height, 8);
+    ASSERT_EQ(srv_desc.Width, width);
+    ASSERT_EQ(srv_desc.Height, height);
     ASSERT_EQ(srv_desc.Format, DXGI_FORMAT_R32_FLOAT);
 
 
 
-    debug_layer->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
 
     //compute minmax via parallel reduction.
-    dispatcher->dispatch_minmax_reduce_shader(srv);
+    bool complete = dispatcher->dispatch_minmax_reduce_shader(srv);
 
     auto minmax_texture = jfa_resources->get_texture(RESOURCE_TYPE::REDUCE_UAV);
 
@@ -93,26 +98,64 @@ namespace {
     D3D11_TEXTURE2D_DESC minmax_desc;
     minmax_texture->GetDesc(&minmax_desc);
 
-    ASSERT_EQ(minmax_desc.Width, 1);
-    ASSERT_EQ(minmax_desc.Height, 1);
+    ASSERT_EQ(minmax_desc.Width, width/JumpFloodDispatch::threads_per_group_width); //num thread groups
+    ASSERT_EQ(minmax_desc.Height, height/JumpFloodDispatch::threads_per_group_width); //num thread groups
     ASSERT_EQ(minmax_desc.Format, DXGI_FORMAT_R32G32_FLOAT);
 
     D3D11_TEXTURE2D_DESC staging_desc;
     staging->GetDesc(&staging_desc);
 
-    ASSERT_EQ(staging_desc.Width, 1);
-    ASSERT_EQ(staging_desc.Height, 1);
+    ASSERT_EQ(staging_desc.Width, width/JumpFloodDispatch::threads_per_group_width);
+    ASSERT_EQ(staging_desc.Height, height/JumpFloodDispatch::threads_per_group_width);
     ASSERT_EQ(staging_desc.Format, DXGI_FORMAT_R32G32_FLOAT);
 
     auto minmax_data = dxutils::copy_to_staging<float2>(context.Get(), staging, minmax_texture);
 
     std::pair<float, float> computed_minmax = {minmax_data[0].x, minmax_data[0].y };
+    if (!complete)
+    {
+        //this path should only run when the UAV is not large enough to loop on in a single warp.
+        //(that is, we would get OOB access with a width smaller than threads_per_group_width).
+        ASSERT_LT(staging_desc.Width, JumpFloodDispatch::threads_per_group_width);
+        ASSERT_LT(staging_desc.Height, JumpFloodDispatch::threads_per_group_width);
+        auto CPU_iter = dxutils::serial_min_max(minmax_data);
+        computed_minmax = CPU_iter;
+    }
+
 
     //compute ground truth reference.
     auto ground_truth = dxutils::serial_min_max(debug_image);
 
-    ASSERT_FLOAT_EQ(minmax_data[0].x, ground_truth.first);
-    ASSERT_FLOAT_EQ(minmax_data[0].y, ground_truth.second);
+    ASSERT_FLOAT_EQ(computed_minmax.first, ground_truth.first);
+    ASSERT_FLOAT_EQ(computed_minmax.second, ground_truth.second);
 
 }
+
+///Kind of a dummy test!
+///Doesn't assert anything serious, Just used for debugging behaviour with the shader by exposing a
+///larger UAV to write to rather than the num_groups_x * num_groups_y one.
+TEST_P(DXSetup, ReduceCustomUAV)
+{
+    auto srv = jfa_resources.value().get_input_srv();
+
+    //lying to the generate interface for our debug UAV.
+    auto uav = jfa_resources->create_reduction_uav(GetParam(),GetParam());
+
+    auto shader = dispatcher->get_shader(SHADERS::MINMAXREDUCE_FIRST);
+
+    ASSERT_TRUE(shader);
+    constexpr uint32_t num_groups_dim = 1;
+    dxinit::run_compute_shader(context.Get(), shader, 1, &srv, nullptr, nullptr,
+                               0, &uav, 1, num_groups_dim,num_groups_dim,num_groups_dim);
+
+    auto minmax_texture = jfa_resources->get_texture(RESOURCE_TYPE::REDUCE_UAV);
+
+    auto staging = jfa_resources.value().create_staging_texture(minmax_texture);
+
+    auto minmax_data = dxutils::copy_to_staging<float2>(context.Get(), staging, minmax_texture);
+
+
+}
+
+INSTANTIATE_TEST_SUITE_P(MinMaxTests, DXSetup, ::testing::Values(8, 16, 32, 64,128,256,512,1024,2048,4096,8192) );
 }

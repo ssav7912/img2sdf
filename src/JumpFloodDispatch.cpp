@@ -98,6 +98,7 @@ ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
         case SHADERS::DISTANCE: {return this->distance_transform_shader.Get();}
         case SHADERS::DISTANCE_NORMALISE: {return this->distance_normalise_shader.Get();}
         case SHADERS::MINMAXREDUCE: {return this->min_max_reduce_shader.Get();}
+        case SHADERS::MINMAXREDUCE_FIRST: { return this->min_max_reduce_firstpass_shader.Get(); }
         default: return nullptr;
     }
 }
@@ -172,7 +173,7 @@ void JumpFloodDispatch::dispatch_distance_transform_shader() {
 
 }
 
-void JumpFloodDispatch::dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv) {
+bool JumpFloodDispatch::dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv) {
     uint32_t num_groups_x = 0;
     uint32_t num_groups_y = 0;
     if (explicit_srv)
@@ -203,22 +204,34 @@ void JumpFloodDispatch::dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* 
     auto uav = resources->create_reduction_uav(num_groups_x, num_groups_y);
 
 
+    //dispatch silently fails if shader is nullptr.
     assert(this->min_max_reduce_shader);
     assert(this->min_max_reduce_firstpass_shader);
     //run the first pass, 'seeding' the reduction with the minmax from the input SRV.
     dxinit::run_compute_shader(context, this->min_max_reduce_firstpass_shader.Get(), 1, &srv, nullptr, nullptr,
                                0, &uav, 1, num_groups_x, num_groups_y, 1);
 
+
+    //only bother with the recursion if there's at least an 8x8 UAV to work with.
+    if (num_groups_x < threads_per_group_width && num_groups_y < threads_per_group_width)
+    {
+        return false;
+    }
     //recursively reduce, dropping the number of groups by half each time. Eventually UAV[0,0] will
     //store the final min-max.
+
     while (num_groups_x > 1u && num_groups_y > 1u)
     {
-        num_groups_x = std::max(1u, num_groups_x / 2);
-        num_groups_y = std::max(1u, num_groups_y / 2);
+
+        num_groups_x = std::max(1ull, num_groups_x / threads_per_group_width);
+        num_groups_y = std::max(1ull, num_groups_y / threads_per_group_width);
+
 
         dxinit::run_compute_shader(context, this->min_max_reduce_shader.Get(), 0, nullptr, nullptr ,
-                                   nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
+                               nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
     }
+
+    return true;
 }
 
 

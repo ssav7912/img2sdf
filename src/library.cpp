@@ -141,7 +141,7 @@ int main(int32_t argc, const char** argv)
     dispatcher.dispatch_voronoi_normalise_shader();
 
     printf("Running Min Max Reduction\n");
-    dispatcher.dispatch_minmax_reduce_shader();
+    bool minmax_reduce_completed = dispatcher.dispatch_minmax_reduce_shader();
 
 
     //copy the finished texture into our staging texture.
@@ -164,14 +164,25 @@ int main(int32_t argc, const char** argv)
     ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
     ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
 
-
+    float minimum = 0;
+    float maximum = 0;
     auto out_minmax = dxutils::copy_to_staging<float2>(dxinit::context.Get(), reduce_staging, reduce_texture);
+    if (!minmax_reduce_completed)
+    {
+        auto computed = dxutils::serial_min_max(out_minmax);
+        minimum = computed.first;
+        maximum = computed.second;
+    }
+    else {
+        minimum = out_minmax[0].x;
+        maximum = out_minmax[0].y;
+    }
+
 
     ID3D11Texture2D* distance_staging = jfa_resources.create_staging_texture(distance_texture.Get());
 
 
     auto out_distance_transform = dxutils::copy_to_staging<float>(dxinit::context.Get(), distance_staging, distance_texture.Get());
-    auto serial_minmax = dxutils::serial_min_max(out_distance_transform);
 
     WICTextureWriter writer {};
 

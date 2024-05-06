@@ -49,6 +49,7 @@ foreach(FILE ${HLSL_SHADER_FILES})
             VERBATIM)
 endforeach(FILE)
 
+
 add_executable(img2sdf library.cpp
         dxinit.cpp
         dxinit.h

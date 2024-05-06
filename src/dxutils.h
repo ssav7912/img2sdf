@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <stdexcept>
+#include "shader_globals.h"
 
 namespace dxutils
 {
@@ -26,7 +27,8 @@ namespace dxutils
 
     ///Serial (pixel-by-pixel) implementation of min/max statistic calculator for an array.
     ///Used as a ground-truth reference for the parallel reduce minmax.
-    std::pair<float, float> serial_min_max(std::vector<float> array);
+    std::pair<float, float> serial_min_max(const std::vector<float>& array);
+    std::pair<float, float> serial_min_max(const std::vector<float2>& array);
 
 
     ///maps a D3D11Texture to a staging resource, and then copies it out to a vector with the specified template type.

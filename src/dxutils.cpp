@@ -37,7 +37,7 @@ std::pair<dxutils::ComPtr<ID3D11Resource>, dxutils::ComPtr<ID3D11ShaderResourceV
 
 }
 
-std::pair<float, float> dxutils::serial_min_max(std::vector<float> array) {
+std::pair<float, float> dxutils::serial_min_max(const std::vector<float>& array) {
     float minimum = std::numeric_limits<float>::infinity();
     float maximum = -std::numeric_limits<float>::infinity();
 
@@ -48,4 +48,18 @@ std::pair<float, float> dxutils::serial_min_max(std::vector<float> array) {
     }
 
     return {minimum, maximum};
+}
+
+std::pair<float, float> dxutils::serial_min_max(const std::vector<float2>& array) {
+    float minimum = std::numeric_limits<float>::infinity();
+    float maximum = -std::numeric_limits<float>::infinity();
+
+    for (const auto value : array)
+    {
+        minimum = std::min(minimum, value.x);
+        maximum = std::max(maximum, value.y);
+    }
+
+    return {minimum, maximum};
+
 }
