@@ -50,6 +50,7 @@ struct alignas(16) JFA_cbuffer
     //normalise function
     float Minimum;
     float Maximum;
+    float Signed; //0 for unsigned field, -1 for signed field.
 };
 
 #pragma pack(16)

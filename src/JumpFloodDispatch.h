@@ -84,6 +84,8 @@ public:
     ///if the routine returns early, you must iterate on the returned resource to find the final minmax value.
     [[nodiscard]] bool dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* explicit_srv = nullptr);
 
+    void dispatch_distance_normalise_shader(float minimum, float maximum, bool is_signed_field);
+
     constexpr static size_t threads_per_group_width = 8;
 private:
 

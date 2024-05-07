@@ -119,7 +119,7 @@ JumpFloodDispatch::dispatch_preprocess_shader() {
 
 void JumpFloodDispatch::dispatch_voronoi_shader() {
 
-    const size_t num_steps = resources->num_steps();
+    const int32_t num_steps = resources->num_steps();
     const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
     const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
@@ -127,7 +127,7 @@ void JumpFloodDispatch::dispatch_voronoi_shader() {
     auto cbuffer = resources->create_const_buffer(false);
     auto voronoi_uav = resources->create_voronoi_uav(false);
 
-    for (size_t i = num_steps; i > 0; i--)
+    for (int32_t i = num_steps; i > 0; i--)
     {
         auto local_buf = resources->get_local_cbuffer();
         local_buf.Iteration = i;
@@ -232,6 +232,28 @@ bool JumpFloodDispatch::dispatch_minmax_reduce_shader(ID3D11ShaderResourceView* 
     }
 
     return true;
+}
+
+void JumpFloodDispatch::dispatch_distance_normalise_shader(float minimum, float maximum, bool is_signed_field) {
+
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
+
+
+    auto uav = resources->create_distance_uav(false);
+
+    auto cbuffer = resources->get_local_cbuffer();
+    cbuffer.Minimum = minimum;
+    cbuffer.Maximum = maximum;
+    cbuffer.Signed = is_signed_field ? -1 : 0;
+
+    auto const_buffer_resource = resources->update_const_buffer(context, cbuffer);
+
+
+   assert(this->distance_normalise_shader);
+   dxinit::run_compute_shader(context, this->distance_normalise_shader.Get(), 0, nullptr, const_buffer_resource, nullptr, 0,
+                               &uav, 1, num_groups_x, num_groups_y, 1);
+
 }
 
 

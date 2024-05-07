@@ -43,7 +43,10 @@ target_link_libraries(${PROJECT_NAME}
 # Now simply link against gtest or gtest_main as needed. Eg
 add_executable(test
         tests/minmax_test.cpp
-        )
+        src/img2sdf.cpp
+        src/img2sdf.h
+        tests/img2sdf_test.cpp
+)
 target_link_libraries(test gtest_main libimg2sdf)
 add_test(NAME example_test COMMAND example)
 

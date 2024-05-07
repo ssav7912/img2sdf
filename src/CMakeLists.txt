@@ -13,7 +13,7 @@ LIST(APPEND CMAKE_PROGRAM_PATH  "C:\\Program Files\\Microsoft Visual Studio\\202
 add_custom_target(shaders COMMENT "Shader Compilation")
 
 set(HLSL_SHADER_FILES jumpflood.hlsl preprocess.hlsl distance.hlsl voronoi_normalise.hlsl
-        minmax_reduce.hlsl minmaxreduce_firstpass.hlsl)
+        minmax_reduce.hlsl minmaxreduce_firstpass.hlsl normalise.hlsl)
 set_source_files_properties(jumpflood.hlsl PROPERTIES ShaderType "cs")
 set_source_files_properties(jumpflood.hlsl PROPERTIES EntryPoint "main")
 
@@ -31,6 +31,9 @@ set_source_files_properties(minmax_reduce.hlsl PROPERTIES EntryPoint "reduce")
 
 set_source_files_properties(minmaxreduce_firstpass.hlsl PROPERTIES ShaderType "cs")
 set_source_files_properties(minmaxreduce_firstpass.hlsl PROPERTIES EntryPoint "reduce_firstpass")
+
+set_source_files_properties(normalise.hlsl PROPERTIES ShaderType "cs")
+set_source_files_properties(normalise.hlsl PROPERTIES EntryPoint "normalise")
 
 set_source_files_properties(${HLSL_SHADER_FILES} PROPERTIES ShaderModel "5_0")
 
@@ -67,10 +70,12 @@ add_executable(img2sdf library.cpp
         JumpFloodDispatch.h
         jumpflooderror.cpp
         jumpflooderror.h
+        img2sdf.cpp
+        img2sdf.h
 )
 
-target_compile_options(img2sdf PUBLIC "/fsanitize=address")
-target_link_options(img2sdf PUBLIC "/fsanitize=address")
+#target_compile_options(img2sdf PUBLIC "/fsanitize=address")
+#target_link_options(img2sdf PUBLIC "/fsanitize=address")
 
 add_library(libimg2sdf STATIC
         dxinit.cpp
@@ -88,7 +93,9 @@ add_library(libimg2sdf STATIC
         JumpFloodDispatch.cpp
         JumpFloodDispatch.h
         jumpflooderror.cpp
-        jumpflooderror.h)
+        jumpflooderror.h
+        img2sdf.cpp
+        img2sdf.h)
 
 
 target_link_libraries(libimg2sdf PRIVATE d3d11.lib d3dcompiler.dll dxguid.lib argparse windowscodecs.lib runtimeobject.lib)

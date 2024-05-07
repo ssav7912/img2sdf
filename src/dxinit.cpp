@@ -182,11 +182,21 @@ void dxinit::run_compute_shader(ID3D11DeviceContext *immediate_context, ID3D11Co
 
     immediate_context->Dispatch(x,y,z);
     immediate_context->CSSetShader(nullptr,nullptr,0);
-    ID3D11UnorderedAccessView* null_view[1] = {nullptr};
-    immediate_context->CSSetUnorderedAccessViews(0,1,null_view, nullptr);
 
-    ID3D11ShaderResourceView* null_SRV[2] = {nullptr,nullptr};
-    immediate_context->CSSetShaderResources(0,2,null_SRV);
+    if (num_UAVs > 0) {
+
+
+        std::vector<ID3D11UnorderedAccessView *> null_view(num_UAVs, nullptr);
+        immediate_context->CSSetUnorderedAccessViews(0, null_view.size(), null_view.data(), nullptr);
+    }
+
+    if (num_views > 0) {
+
+
+        std::vector<ID3D11ShaderResourceView *> null_SRV(num_views, nullptr);
+        immediate_context->CSSetShaderResources(0, null_SRV.size(), null_SRV.data());
+    }
+
 
     ID3D11Buffer* null_CB[1] = {nullptr};
     immediate_context->CSSetConstantBuffers(0,1, null_CB);

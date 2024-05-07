@@ -22,6 +22,7 @@
 #include "shaders/distance.hcs"
 #include "shaders/minmax_reduce.hcs"
 #include "shaders/minmaxreduce_firstpass.hcs"
+#include "shaders/normalise.hcs"
 
 using namespace Microsoft::WRL;
 
@@ -38,9 +39,6 @@ int main(int32_t argc, const char** argv)
         printf("Failed to create compute device.");
         return -1;
     }
-#ifdef DEBUG
-    dxinit::debug_layer->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
-#endif
 
     //parse arguments
     argparse::ArgumentParser program_parser {parsing::PROGRAM_NAME};
@@ -120,6 +118,9 @@ int main(int32_t argc, const char** argv)
         .min_max_reduce = g_reduce,
         .min_max_reduce_size = sizeof(g_reduce),
 
+        .distance_normalise = g_normalise,
+        .distance_normalise_size = sizeof(g_normalise)
+
     };
 
     //dispatcher probably shouldn't also be compiling.
@@ -133,6 +134,7 @@ int main(int32_t argc, const char** argv)
     dispatcher.dispatch_voronoi_shader();
 
 
+
     printf("Running Distance Transform Compute Shader\n");
 
     dispatcher.dispatch_distance_transform_shader();
@@ -142,6 +144,7 @@ int main(int32_t argc, const char** argv)
 
     printf("Running Min Max Reduction\n");
     bool minmax_reduce_completed = dispatcher.dispatch_minmax_reduce_shader();
+
 
 
     //copy the finished texture into our staging texture.
@@ -164,6 +167,11 @@ int main(int32_t argc, const char** argv)
     ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
     ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
 
+
+#ifdef DEBUG
+    dxinit::debug_layer->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+#endif
+
     float minimum = 0;
     float maximum = 0;
     auto out_minmax = dxutils::copy_to_staging<float2>(dxinit::context.Get(), reduce_staging, reduce_texture);
@@ -178,6 +186,7 @@ int main(int32_t argc, const char** argv)
         maximum = out_minmax[0].y;
     }
 
+    dispatcher.dispatch_distance_normalise_shader(minimum, maximum, false);
 
     ID3D11Texture2D* distance_staging = jfa_resources.create_staging_texture(distance_texture.Get());
 

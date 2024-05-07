@@ -33,6 +33,11 @@ public:
 
     JumpFloodResources(ID3D11Device* device, const std::vector<float> data, int32_t width, int32_t height);
 
+    ///Initialise an SRV from an existing ID3D11Texture2D.
+    ///@param input_texture a texture with a width and height power of 2 size. Must have D3D11_USAGE_DEFAULT, DXGI_FORMAT_R32_FLOAT,
+    ///and D3D11_BIND_SHADER_RESOURCE.
+    JumpFloodResources(ID3D11Device* device, ComPtr<ID3D11Texture2D> input_texture);
+
     ///Returns a weak pointer to the input SRV.
     ///The SRV is into an R32_Float Texture2D.
     ID3D11ShaderResourceView* get_input_srv();
@@ -69,12 +74,13 @@ public:
 
     ID3D11UnorderedAccessView* create_reduction_uav(size_t num_groups_x, size_t num_groups_y, bool regenerate = true);
 
+
     ///Gets the width and height of the resources. Every resource has the same pixel width and height.
     ///returns {0,0} if the input SRV has not been loaded.
     [[nodiscard]] resolution get_resolution() const;
 
     ///Returns the number of passes the JFA kernel needs to make for a square texture.
-    [[nodiscard]] size_t num_steps() const;
+    [[nodiscard]] int32_t num_steps() const;
 
 private:
 

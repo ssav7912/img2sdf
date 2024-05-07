@@ -7,6 +7,7 @@ cbuffer constants : register(b0)
 
     float minimum;
     float maximum;
+    float is_signed;
 };
 
 //translate a 2D index into a 1D index (i.e. as though data were flat)

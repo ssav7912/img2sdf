@@ -63,3 +63,7 @@ std::pair<float, float> dxutils::serial_min_max(const std::vector<float2>& array
     return {minimum, maximum};
 
 }
+
+bool dxutils::is_power_of_two(uint32_t n) {
+    return !(n & (n - 1));
+}

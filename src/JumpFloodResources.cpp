@@ -7,6 +7,7 @@
 #include <format>
 #include <limits>
 #include <vector>
+#include <array>
 #include "jumpflooderror.h"
 
 JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::wstring& file_path) :
@@ -75,6 +76,48 @@ JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::vector<f
 
 }
 
+
+JumpFloodResources::JumpFloodResources(ID3D11Device *device, ComPtr<ID3D11Texture2D> input_texture)
+    : device(device) {
+
+    if (device == nullptr)
+    {
+        throw std::runtime_error("ID3D11Device is NULL");
+    }
+
+    D3D11_TEXTURE2D_DESC in_desc = {0};
+    input_texture->GetDesc(&in_desc);
+
+    if (in_desc.Format != DXGI_FORMAT_R32_FLOAT)
+    {
+        throw std::runtime_error("Format must be DXGI_FORMAT_R32_FLOAT");
+    }
+    else if (in_desc.Usage != D3D11_USAGE_DEFAULT)
+    {
+        throw std::runtime_error("Usage must be D3D11_USAGE_DEFAULT");
+    }
+    else if ((in_desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) == 0)
+    {
+        throw std::runtime_error("Must be bindable as an SRV!");
+    }
+
+    else if (!dxutils::is_power_of_two(in_desc.Width) || !dxutils::is_power_of_two(in_desc.Height))
+    {
+        throw std::runtime_error("Texture must be a power of two size!");
+    }
+
+    HRESULT out_srv = device->CreateShaderResourceView(input_texture.Get(), nullptr, preprocess_srv.GetAddressOf());
+    if (FAILED(out_srv))
+    {
+        throw jumpflood_error(out_srv, "Could not create SRV from input_texture");
+    }
+
+    this->preprocess_texture = input_texture;
+    this->input_description = in_desc;
+    this->res.height = in_desc.Height;
+    this->res.width = in_desc.Width;
+}
+
 ID3D11ShaderResourceView *JumpFloodResources::create_input_srv(std::wstring filepath) {
     auto input = dxutils::load_texture_to_srv(filepath, device);
 
@@ -86,6 +129,11 @@ ID3D11ShaderResourceView *JumpFloodResources::create_input_srv(std::wstring file
     }
 
     this->preprocess_srv = input.second;
+#ifdef DEBUG
+    D3D_SET_OBJECT_NAME_A(this->preprocess_texture, "JumpFloodResources::preprocess_texture");
+    D3D_SET_OBJECT_NAME_A(this->preprocess_srv, "JumpFloodResources::preprocess_srv");
+#endif
+
     D3D11_TEXTURE2D_DESC texture_description = {0};
     this->preprocess_texture->GetDesc(&texture_description);
     //TODO: link up to a logger class.
@@ -112,6 +160,11 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_voronoi_uav(bool regenerat
         this->voronoi_texture = voronoi.first;
         this->voronoi_uav = voronoi.second;
 
+#ifdef DEBUG
+        D3D_SET_OBJECT_NAME_A(this->voronoi_uav, "JumpFloodResources:voronoi_uav");
+        D3D_SET_OBJECT_NAME_A(this->voronoi_texture, "JumpFloodResources::voronoi_texture");
+#endif
+
         return this->voronoi_uav.Get();
     }
     catch (...)
@@ -133,6 +186,11 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav(bool regenera
         auto distance = create_uav<float>(DXGI_FORMAT_R32_FLOAT, D3D11_BIND_SHADER_RESOURCE);
         this->distance_texture = distance.first;
         this->distance_uav = distance.second;
+
+#ifdef DEBUG
+        D3D_SET_OBJECT_NAME_A(this->distance_uav, "JumpFloodResources::distance_uav");
+        D3D_SET_OBJECT_NAME_A(this->distance_texture, "JumpFloodResources::distance_texture");
+#endif
 
         return this->distance_uav.Get();
     }
@@ -161,6 +219,17 @@ ID3D11Texture2D* JumpFloodResources::create_staging_texture(ID3D11Texture2D* mim
         return nullptr;
     }
     this->staging_texture = CPU_read_texture;
+#ifdef DEBUG
+    std::array<char, 256> buffer {0};
+    UINT private_data_size = buffer.size();
+
+    mimic_texture->GetPrivateData(WKPDID_D3DDebugObjectName, &private_data_size, buffer.data());
+
+    std::string name (buffer.data());
+    name += "_staging";
+
+    D3D_SET_OBJECT_NAME_A(this->staging_texture, name.c_str());
+#endif
     return this->staging_texture.Get();
 }
 
@@ -217,7 +286,7 @@ ID3D11Texture2D *JumpFloodResources::get_texture(RESOURCE_TYPE desired_texture) 
     }
 }
 
-size_t JumpFloodResources::num_steps() const {
+int32_t JumpFloodResources::num_steps() const {
     return floor(log2(static_cast<double>(res.width)));
 }
 
@@ -279,6 +348,11 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_reduction_uav(size_t num_g
         throw jumpflood_error(out_uav, "Could not create output UAV for minmax reduction.");
     }
 
+#ifdef DEBUG
+    D3D_SET_OBJECT_NAME_A(this->reduce_texture, "JumpFloodResources::reduce_texture");
+    D3D_SET_OBJECT_NAME_A(this->reduce_uav, "JumpFloodResources::reduce_uav");
+#endif
+
     return this->reduce_uav.Get();
 
 }
@@ -295,7 +369,11 @@ ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view(bool regener
     {
         throw jumpflood_error(srv, "Could not create input SRV for minmax reduction.");
     }
+#ifdef DEBUG
+    D3D_SET_OBJECT_NAME_A(this->reduce_input_srv, "JumpFloodResources::reduce_input_srv");
+#endif
 
     return this->reduce_input_srv.Get();
 }
+
 

@@ -56,6 +56,8 @@ namespace dxutils
         return out_data;
     }
 
+    bool is_power_of_two(uint32_t n);
+
 }
 
 #endif //IMG2SDF_DXUTILS_H
