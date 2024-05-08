@@ -1,6 +1,6 @@
 
 
-#include "library.h"
+#include "program.h"
 
 #include <iostream>
 #include <d3d11.h>
@@ -94,7 +94,7 @@ int main(int32_t argc, const char** argv)
 
     //create staging texture for CPU read.
     ID3D11Texture2D* voronoi_texture = jfa_resources.get_texture(RESOURCE_TYPE::VORONOI_UAV);
-    ID3D11Texture2D* CPU_read_texture = jfa_resources.create_staging_texture(voronoi_texture);
+    ID3D11Texture2D* CPU_read_texture = jfa_resources.create_owned_staging_texture(voronoi_texture);
 
 
 
@@ -165,7 +165,7 @@ int main(int32_t argc, const char** argv)
     }
 
     ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
-    ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
+    ID3D11Texture2D* reduce_staging = jfa_resources.create_owned_staging_texture(reduce_texture);
 
 
 #ifdef DEBUG
@@ -188,7 +188,7 @@ int main(int32_t argc, const char** argv)
 
     dispatcher.dispatch_distance_normalise_shader(minimum, maximum, false);
 
-    ID3D11Texture2D* distance_staging = jfa_resources.create_staging_texture(distance_texture.Get());
+    ID3D11Texture2D* distance_staging = jfa_resources.create_owned_staging_texture(distance_texture.Get());
 
 
     auto out_distance_transform = dxutils::copy_to_staging<float>(dxinit::context.Get(), distance_staging, distance_texture.Get());

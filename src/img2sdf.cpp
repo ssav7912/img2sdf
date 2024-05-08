@@ -72,7 +72,7 @@ Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> i
     };
 
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch dispatch {dxinit::device.Get(), dxinit::context.Get(), shaders, &jfa_resources};
+    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), shaders, &jfa_resources};
 
     dispatch.dispatch_preprocess_shader();
     dispatch.dispatch_voronoi_shader();
@@ -84,12 +84,12 @@ Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> i
         bool minmax_reduce_completed = dispatch.dispatch_minmax_reduce_shader();
 
         ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
-        ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
+        ID3D11Texture2D* reduce_staging = jfa_resources.create_owned_staging_texture(reduce_texture);
 
 
         float minimum = 0;
         float maximum = 0;
-        auto out_minmax = dxutils::copy_to_staging<float2>(dxinit::context.Get(), reduce_staging, reduce_texture);
+        auto out_minmax = dxutils::copy_to_staging<float2>(this->context.Get(), reduce_staging, reduce_texture);
         if (!minmax_reduce_completed)
         {
             auto computed = dxutils::serial_min_max(out_minmax);
@@ -160,24 +160,31 @@ Img2SDF::compute_unsigned_distance_field(ComPtr<ID3D11Texture2D> input_texture, 
     };
 
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch dispatch {dxinit::device.Get(), dxinit::context.Get(), shaders, &jfa_resources};
+    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), shaders, &jfa_resources};
 
     dispatch.dispatch_preprocess_shader();
     dispatch.dispatch_voronoi_shader();
 
     dispatch.dispatch_distance_transform_shader();
 
+#if DEBUG
+    auto distance_transform_staging = dxutils::create_staging_texture(this->device.Get(), distance_texture.Get());
+
+    auto distance_transform_data = dxutils::copy_to_staging<float>(this->context.Get(), distance_transform_staging.Get(), distance_texture.Get());
+
+#endif
+
     if (normalise)
     {
         bool minmax_reduce_completed = dispatch.dispatch_minmax_reduce_shader();
 
         ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
-        ID3D11Texture2D* reduce_staging = jfa_resources.create_staging_texture(reduce_texture);
+        ID3D11Texture2D* reduce_staging = jfa_resources.create_owned_staging_texture(reduce_texture);
 
 
         float minimum = 0;
         float maximum = 0;
-        auto out_minmax = dxutils::copy_to_staging<float2>(dxinit::context.Get(), reduce_staging, reduce_texture);
+        auto out_minmax = dxutils::copy_to_staging<float2>(this->context.Get(), reduce_staging, reduce_texture);
         if (!minmax_reduce_completed)
         {
             auto computed = dxutils::serial_min_max(out_minmax);

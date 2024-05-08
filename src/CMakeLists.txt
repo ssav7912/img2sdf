@@ -53,7 +53,7 @@ foreach(FILE ${HLSL_SHADER_FILES})
 endforeach(FILE)
 
 
-add_executable(img2sdf library.cpp
+add_executable(img2sdf program.cpp
         dxinit.cpp
         dxinit.h
         WICTextureLoader.cpp
@@ -61,7 +61,7 @@ add_executable(img2sdf library.cpp
         dxutils.cpp
         dxutils.h
         shader_globals.h
-        library.h
+        program.h
         WICTextureWriter.cpp
         WICTextureWriter.h
         JumpFloodResources.cpp
@@ -85,7 +85,7 @@ add_library(libimg2sdf STATIC
         dxutils.cpp
         dxutils.h
         shader_globals.h
-        library.h
+        program.h
         WICTextureWriter.cpp
         WICTextureWriter.h
         JumpFloodResources.cpp

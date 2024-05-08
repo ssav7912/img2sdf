@@ -181,6 +181,12 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav(bool regenera
     {
         return this->distance_uav.Get();
     }
+#if DEBUG
+    else if (this->distance_uav == nullptr && !regenerate)
+    {
+      printf("WARNING: JumpFloodResources::create_distance_uav: distance_uav is null, but regenerate == false! Regenerating anyway.\n");
+    }
+#endif
 
     try {
         auto distance = create_uav<float>(DXGI_FORMAT_R32_FLOAT, D3D11_BIND_SHADER_RESOURCE);
@@ -202,36 +208,14 @@ ID3D11UnorderedAccessView *JumpFloodResources::create_distance_uav(bool regenera
     }
 }
 
-ID3D11Texture2D* JumpFloodResources::create_staging_texture(ID3D11Texture2D* mimic_texture)
+ID3D11Texture2D* JumpFloodResources::create_owned_staging_texture(ID3D11Texture2D* mimic_texture)
 {
-    D3D11_TEXTURE2D_DESC staging_desc;
-    mimic_texture->GetDesc(&staging_desc);
+    ComPtr<ID3D11Texture2D> CPU_read_texture = dxutils::create_staging_texture(this->device, mimic_texture);
 
-    staging_desc.Usage = D3D11_USAGE_STAGING;
-    staging_desc.BindFlags = 0;
-    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-
-    ComPtr<ID3D11Texture2D> CPU_read_texture = nullptr;
-    HRESULT out_staging = device->CreateTexture2D(&staging_desc, nullptr, CPU_read_texture.GetAddressOf());
-    if (FAILED(out_staging))
-    {
-        throw std::runtime_error(std::format("Could not create staging texture. HRESULT {:x}\n", out_staging));
-        return nullptr;
-    }
     this->staging_texture = CPU_read_texture;
-#ifdef DEBUG
-    std::array<char, 256> buffer {0};
-    UINT private_data_size = buffer.size();
-
-    mimic_texture->GetPrivateData(WKPDID_D3DDebugObjectName, &private_data_size, buffer.data());
-
-    std::string name (buffer.data());
-    name += "_staging";
-
-    D3D_SET_OBJECT_NAME_A(this->staging_texture, name.c_str());
-#endif
     return this->staging_texture.Get();
 }
+
 
 resolution JumpFloodResources::get_resolution() const {
     return this->res;

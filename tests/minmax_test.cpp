@@ -2,6 +2,7 @@
 // Created by Soren on 26/04/2024.
 //
 #include <random>
+#include <filesystem>
 
 #include "../src/dxutils.h"
 #include "../src/dxinit.h"
@@ -10,6 +11,8 @@
 
 #include "../src/shaders/minmax_reduce.hcs"
 #include "../src/shaders/minmaxreduce_firstpass.hcs"
+#include "../src/img2sdf.h"
+#include "../src/WICTextureLoader.h"
 
 #include "gtest/gtest.h"
 
@@ -93,7 +96,7 @@ class DXSetup : public testing::TestWithParam<int32_t> {
 
     auto minmax_texture = jfa_resources->get_texture(RESOURCE_TYPE::REDUCE_UAV);
 
-    auto staging = jfa_resources.value().create_staging_texture(minmax_texture);
+    auto staging = jfa_resources.value().create_owned_staging_texture(minmax_texture);
 
     D3D11_TEXTURE2D_DESC minmax_desc;
     minmax_texture->GetDesc(&minmax_desc);
@@ -150,12 +153,50 @@ TEST_P(DXSetup, ReduceCustomUAV)
 
     auto minmax_texture = jfa_resources->get_texture(RESOURCE_TYPE::REDUCE_UAV);
 
-    auto staging = jfa_resources.value().create_staging_texture(minmax_texture);
+    auto staging = jfa_resources.value().create_owned_staging_texture(minmax_texture);
 
     auto minmax_data = dxutils::copy_to_staging<float2>(context.Get(), staging, minmax_texture);
 
 
 }
+
+    TEST(integration_tests, compute_unsigned_distance_field)
+    {
+        Windows::Foundation::Initialize(RO_INIT_MULTITHREADED);
+        ComPtr<ID3D11Device> device;
+        ComPtr<ID3D11DeviceContext> context;
+        ASSERT_HRESULT_SUCCEEDED(dxinit::create_compute_device(device.GetAddressOf(), context.GetAddressOf(), false));
+
+        Img2SDF sdf(device, context, dxinit::debug_layer);
+
+        ComPtr<ID3D11Resource> in_resource = nullptr;
+        ComPtr<ID3D11ShaderResourceView> _ = nullptr;
+
+        auto absolute_texture_path = std::filesystem::absolute({"../tests/resources/test.png"});
+
+        ASSERT_HRESULT_SUCCEEDED(CreateWICR32FTextureFromFile(device.Get(), absolute_texture_path.wstring().c_str(),
+                                                              in_resource.GetAddressOf(), _.GetAddressOf()));
+
+        ComPtr<ID3D11Texture2D> in_texture;
+        ASSERT_HRESULT_SUCCEEDED(in_resource.As(&in_texture));
+
+        ComPtr<ID3D11Texture2D> texture;
+        EXPECT_NO_THROW(texture = sdf.compute_unsigned_distance_field(in_texture, true));
+
+        auto staging = dxutils::create_staging_texture(device.Get(), texture.Get());
+
+        auto input_staging = dxutils::create_staging_texture(device.Get(), in_texture.Get());
+
+        auto data = dxutils::copy_to_staging<float>(context.Get(), staging.Get(), texture.Get());
+
+        auto input_data = dxutils::copy_to_staging<float>(context.Get(), input_staging.Get(), in_texture.Get());
+
+        ASSERT_EQ(data.size(), input_data.size());
+
+        for (int i = 0; i < data.size(); ++i) {
+            EXPECT_NE(data[i], input_data[i]) << "Vectors x and y differ at index " << i;
+        }
+    }
 
 INSTANTIATE_TEST_SUITE_P(MinMaxTests, DXSetup, ::testing::Values(8, 16, 32, 64,128,256,512,1024,2048,4096,8192) );
 }

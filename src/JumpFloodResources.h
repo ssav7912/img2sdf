@@ -6,7 +6,7 @@
 #define IMG2SDF_JUMPFLOODRESOURCES_H
 #include "dxinit.h"
 #include "dxutils.h"
-#include "library.h"
+#include "program.h"
 #include "shader_globals.h"
 #include <wrl.h>
 #include <stdexcept>
@@ -60,7 +60,8 @@ public:
     ///Initialises a staging texture for CPU readback, using the input `mimic_texture` as a template.
     ///Note that the staging texture subresource is *not* initialised, so it must be copied to before reading!
     ///Returns a weak pointer to the texture. Ownership is ultimately managed by this object.
-    ID3D11Texture2D* create_staging_texture(ID3D11Texture2D* mimic_texture);
+    ID3D11Texture2D* create_owned_staging_texture(ID3D11Texture2D* mimic_texture);
+
 
     ///Creates a constant buffer containing the texture Width and Height to use as a shader constant.
     ID3D11Buffer* create_const_buffer(bool regenerate = true);

@@ -80,10 +80,10 @@ device(device), context(context), resources(resources) {
 
     if (byte_code.distance_normalise != nullptr) {
         hr = device->CreateComputeShader(byte_code.distance_normalise, byte_code.distance_normalise_size, nullptr,
-                                         distance_transform_shader.GetAddressOf());
+                                         distance_normalise_shader.GetAddressOf());
 
         if (FAILED(hr)) {
-            throw jumpflood_error(hr, "Cound not create distance transform shader.");
+            throw jumpflood_error(hr, "Could not create distance transform shader.");
         }
     }
 
