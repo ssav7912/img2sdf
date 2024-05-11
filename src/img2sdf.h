@@ -29,6 +29,9 @@ public:
     ///@param normalise whether to normalise the result to 0, 1.
     ComPtr<ID3D11Texture2D> compute_unsigned_distance_field(ComPtr<ID3D11Texture2D> input_texture, bool normalise = true);
 
+    ///Computes a voronoi transform from the provided seed texture.
+    ///@param input_texture a seed mask of size 2^n * 2^n, with D3D11_BIND_SHADER_RESOURCE, DXGI_FORMAT_R32_FLOAT, and D3D11_USAGE_DEFAUT.
+    ///@param normalise whether to normalise the result to normalised texel coordinates (0-1 along width and height).
     ComPtr<ID3D11Texture2D> compute_voronoi_transform(ComPtr<ID3D11Texture2D> input_texture, bool normalise = false);
 
 private:

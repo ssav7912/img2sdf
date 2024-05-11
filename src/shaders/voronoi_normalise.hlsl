@@ -3,7 +3,7 @@
 RWTexture2D<float4> Seeds : register(u0);
 
 ///debug utility to remap voronoi cell coords to a normalised form.
-[numthreads(8,8,1)]
+[numthreads(GROUP_THREAD_DIM,GROUP_THREAD_DIM,1)]
 void voronoi_normalise(uint3 dispatchThreadId: SV_DispatchThreadID)
 {
     float4 seed = Seeds[dispatchThreadId.xy].rgba;

@@ -48,6 +48,10 @@ int main(int32_t argc, const char** argv)
 
     program_parser.add_argument(parsing::OUTPUT_ARGUMENT).help("Output image.");
 
+    auto& group = program_parser.add_mutually_exclusive_group(true);
+    group.add_argument(parsing::UNSIGNED, parsing::UNSIGNED_LONG).help("Generate an unsigned distance field.").flag();
+    group.add_argument(parsing::VORONOI, parsing::VORONOI_LONG).help("Generate a voronoi diagram.").flag();
+
     try {
         program_parser.parse_args(argc, argv);
     }
@@ -66,8 +70,11 @@ int main(int32_t argc, const char** argv)
     ComPtr<ID3D11Resource> in_resource = nullptr;
     ComPtr<ID3D11ShaderResourceView> _ = nullptr;
 
-
+#ifdef DEBUG
     Img2SDF img2sdf{dxinit::device, dxinit::context, dxinit::debug_layer};
+#else
+    Img2SDF img2sdf{dxinit::device, dxinit::context};
+#endif
 
     HRESULT wic_hr = CreateWICR32FTextureFromFile(dxinit::device.Get(), absolute_texture_path.wstring().c_str(),
                                                   in_resource.GetAddressOf(), _.GetAddressOf());
@@ -82,9 +89,19 @@ int main(int32_t argc, const char** argv)
         return -1;
     }
 
+    WICPixelFormatGUID resource_format;
+    ComPtr<ID3D11Texture2D> out_texture = nullptr;
+    if (program_parser.is_used(parsing::UNSIGNED))
+    {
+        resource_format = GUID_WICPixelFormat32bppGrayFloat;
+        out_texture = img2sdf.compute_unsigned_distance_field(in_texture, true);
 
-    auto out_texture = img2sdf.compute_unsigned_distance_field(in_texture, true);
-
+    }
+    else if (program_parser.is_used(parsing::VORONOI))
+    {
+        resource_format = GUID_WICPixelFormat128bppRGBAFloat;
+        out_texture = img2sdf.compute_voronoi_transform(in_texture, true);
+    }
 
     auto staging = dxutils::create_staging_texture(dxinit::device.Get(), out_texture.Get());
     D3D11_TEXTURE2D_DESC out_desc{0};
@@ -100,7 +117,6 @@ int main(int32_t argc, const char** argv)
 
     printf("Finished shader. Writing Output File.\n");
 
-    const WICPixelFormatGUID resource_format = GUID_WICPixelFormat32bppGrayFloat;
     const WICPixelFormatGUID output_format = GUID_WICPixelFormat32bppRGBA;
     auto output_file = program_parser.get(parsing::OUTPUT_ARGUMENT);
     HRESULT out_result = writer.write_texture(output_file, Width, Height, mapped_resource.RowPitch,

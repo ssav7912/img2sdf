@@ -28,7 +28,7 @@ void minimum_distance(float2 position, float4 target_point, inout float4 mindist
 
 
 
-[numthreads(8,8,1)]
+[numthreads(GROUP_THREAD_DIM,GROUP_THREAD_DIM,1)]
 void main(uint3 groupId : SV_GroupID, uint3 groupThreadID : SV_GroupThreadID, uint3 dispatchThreadId : SV_DispatchThreadID,
             uint groupIndex : SV_GroupIndex)
 {

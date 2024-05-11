@@ -6,6 +6,9 @@
 
 #include "JumpFloodResources.h"
 #include "jumpflooderror.h"
+#include "JumpFloodDispatch.h"
+#include "dxutils.h"
+#include "dxinit.h"
 
 //shaders
 #include "shaders/jumpflood.hcs"
@@ -15,7 +18,9 @@
 #include "shaders/minmax_reduce.hcs"
 #include "shaders/minmaxreduce_firstpass.hcs"
 #include "shaders/normalise.hcs"
-#include "JumpFloodDispatch.h"
+#include "shaders/invert.hcs"
+#include "shaders/composite.hcs"
+
 
 Img2SDF::Img2SDF(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> context, ComPtr<ID3D11Debug> debug_layer)
 : device(std::move(device)), context(std::move(context)), debug_layer(std::move(debug_layer)) { }
@@ -30,32 +35,39 @@ Microsoft::WRL::ComPtr<ID3D11Texture2D>
 Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> input_texture, bool normalise)
 {
     //TODO: make signed.
-    auto jfa_resources = JumpFloodResources(device.Get(), std::move(input_texture));
+    auto outer_jfa_resources = JumpFloodResources(device.Get(), input_texture);
+    auto inner_jfa_resources = JumpFloodResources(device.Get(), input_texture);
 
-    const size_t Width = jfa_resources.get_resolution().width;
-    const size_t Height = jfa_resources.get_resolution().height;
+    const size_t Width = outer_jfa_resources.get_resolution().width;
+    const size_t Height = outer_jfa_resources.get_resolution().height;
 
-    ID3D11UnorderedAccessView* voronoi_uav = jfa_resources.create_voronoi_uav(false);
+    ID3D11UnorderedAccessView* outer_voronoi_uav = outer_jfa_resources.create_voronoi_uav(false);
+    ID3D11UnorderedAccessView* inner_voronoi_uav = inner_jfa_resources.create_voronoi_uav(false);
 
-    ID3D11UnorderedAccessView* distance_uav = jfa_resources.create_distance_uav(false);
+    ID3D11UnorderedAccessView* outer_distance_uav = outer_jfa_resources.create_distance_uav(false);
+    ID3D11UnorderedAccessView* inner_distance_uav = inner_jfa_resources.create_distance_uav(false);
 
-    ComPtr<ID3D11Texture2D> distance_texture = nullptr;
+    ComPtr<ID3D11Texture2D> inner_distance_texture = nullptr;
     //inner scope to release temporary distance_resource after ownership is transferred.
     {
-        ComPtr<ID3D11Resource> distance_resource;
-        distance_uav->GetResource(distance_resource.GetAddressOf());
-        HRESULT out = distance_resource.As<ID3D11Texture2D>(&distance_texture);
+        ComPtr<ID3D11Resource> inner_distance_resource;
+        inner_distance_uav->GetResource(inner_distance_resource.GetAddressOf());
+        HRESULT out = inner_distance_resource.As<ID3D11Texture2D>(&inner_distance_texture);
         if (FAILED(out)) {
             throw jumpflood_error(out, "Returned Resource from Distance UAV was not a Texture2D\n");
             return nullptr;
         }
     }
 
-    ID3D11Buffer* const_buffer = jfa_resources.create_const_buffer();
+    ID3D11Buffer* outer_const_buffer = outer_jfa_resources.create_const_buffer();
+    ID3D11Buffer* inner_const_buffer = inner_jfa_resources.create_const_buffer();
 
     jump_flood_shaders shaders {
             .preprocess = g_preprocess,
             .preprocess_size = sizeof(g_preprocess),
+
+            .preprocess_invert = g_invert,
+            .preprocess_invert_size = sizeof(g_invert),
 
             .voronoi = g_main,
             .voronoi_size = sizeof(g_main),
@@ -73,24 +85,35 @@ Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> i
             .min_max_reduce_size = sizeof(g_reduce),
 
             .distance_normalise = g_normalise,
-            .distance_normalise_size = sizeof(g_normalise)
+            .distance_normalise_size = sizeof(g_normalise),
+
+            .composite = g_composite,
+            .composite_size = sizeof(g_composite),
 
     };
 
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), shaders, &jfa_resources};
+    JumpFloodDispatch outer_dispatch {this->device.Get(), this->context.Get(), shaders, &outer_jfa_resources};
+    JumpFloodDispatch inner_dispatch {this->device.Get(), this->context.Get(), shaders, &inner_jfa_resources};
 
-    dispatch.dispatch_preprocess_shader();
-    dispatch.dispatch_voronoi_shader();
+    outer_dispatch.dispatch_preprocess_shader();
+    outer_dispatch.dispatch_voronoi_shader();
 
-    dispatch.dispatch_distance_transform_shader();
+    outer_dispatch.dispatch_distance_transform_shader();
+
+    inner_dispatch.dispatch_preprocess_shader(true);
+    inner_dispatch.dispatch_voronoi_shader();
+    inner_dispatch.dispatch_distance_transform_shader();
+
+
+    inner_dispatch.dispatch_composite_shader(outer_distance_uav);
 
     if (normalise)
     {
-        bool minmax_reduce_completed = dispatch.dispatch_minmax_reduce_shader();
+        bool minmax_reduce_completed = inner_dispatch.dispatch_minmax_reduce_shader();
 
-        ID3D11Texture2D* reduce_texture = jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
-        ID3D11Texture2D* reduce_staging = jfa_resources.create_owned_staging_texture(reduce_texture);
+        ID3D11Texture2D* reduce_texture = inner_jfa_resources.get_texture(RESOURCE_TYPE::REDUCE_UAV);
+        ID3D11Texture2D* reduce_staging = inner_jfa_resources.create_owned_staging_texture(reduce_texture);
 
 
         float minimum = 0;
@@ -107,13 +130,13 @@ Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> i
             maximum = out_minmax[0].y;
         }
 
-        dispatch.dispatch_distance_normalise_shader(minimum, maximum, false);
+        inner_dispatch.dispatch_distance_normalise_shader(minimum, maximum, true);
 
     }
 
 
 
-    return jfa_resources.get_texture(RESOURCE_TYPE::DISTANCE_UAV);
+    return inner_jfa_resources.get_texture(RESOURCE_TYPE::DISTANCE_UAV);
 }
 
 ComPtr<ID3D11Texture2D>

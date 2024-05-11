@@ -1,6 +1,5 @@
 
-#define GROUP_THREAD_DIM 8
-
+#include "common.hlsi"
 //evil bad hack!
 groupshared float2 minmax[GROUP_THREAD_DIM*GROUP_THREAD_DIM];
 

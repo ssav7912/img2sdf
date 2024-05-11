@@ -31,6 +31,16 @@ device(device), context(context), resources(resources) {
         }
     }
 
+    if (byte_code.preprocess_invert != nullptr) {
+        hr = device->CreateComputeShader(byte_code.preprocess_invert, byte_code.preprocess_invert_size, nullptr,
+                                         preprocess_invert_shader.GetAddressOf());
+
+        if (FAILED(hr))
+        {
+            throw jumpflood_error(hr, "Could not create Preprocess inversion shader.");
+        }
+    }
+
     if (byte_code.voronoi != nullptr) {
 
 
@@ -87,12 +97,23 @@ device(device), context(context), resources(resources) {
         }
     }
 
+    if (byte_code.composite != nullptr)
+    {
+        hr = device->CreateComputeShader(byte_code.composite, byte_code.composite_size, nullptr,
+                                         composite_shader.GetAddressOf());
+        if (FAILED(hr))
+        {
+            throw jumpflood_error(hr, "Coud not create composite shader.");
+        }
+    }
+
 }
 
 ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
     switch (shader)
     {
         case SHADERS::PREPROCESS: {return this->preprocess_shader.Get();}
+        case SHADERS::PREPROCESS_INVERT: {return this->preprocess_invert_shader.Get();}
         case SHADERS::VORONOI: {return this->voronoi_shader.Get();}
         case SHADERS::VORONOI_NORMALISE: {return this->voronoi_normalise_shader.Get();}
         case SHADERS::DISTANCE: {return this->distance_transform_shader.Get();}
@@ -104,7 +125,7 @@ ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
 }
 
 void
-JumpFloodDispatch::dispatch_preprocess_shader() {
+JumpFloodDispatch::dispatch_preprocess_shader(bool invert) {
     const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
     const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
 
@@ -112,9 +133,12 @@ JumpFloodDispatch::dispatch_preprocess_shader() {
     auto cbuffer = resources->create_const_buffer(false);
     auto uav = resources->create_voronoi_uav(false);
 
-    assert(preprocess_shader);
-    dxinit::run_compute_shader(context, preprocess_shader.Get(), 1, &srv,
-                               cbuffer, nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
+    auto& shader = invert ? preprocess_invert_shader : preprocess_shader;
+
+
+    assert(shader);
+    dxinit::run_compute_shader(context, shader.Get(), 1, &srv,
+                       cbuffer, nullptr, 0, &uav, 1, num_groups_x, num_groups_y, 1);
 }
 
 void JumpFloodDispatch::dispatch_voronoi_shader() {
@@ -253,6 +277,23 @@ void JumpFloodDispatch::dispatch_distance_normalise_shader(float minimum, float 
    assert(this->distance_normalise_shader);
    dxinit::run_compute_shader(context, this->distance_normalise_shader.Get(), 0, nullptr, const_buffer_resource, nullptr, 0,
                                &uav, 1, num_groups_x, num_groups_y, 1);
+
+}
+
+void JumpFloodDispatch::dispatch_composite_shader(ID3D11UnorderedAccessView *outer_uav) {
+
+
+    const uint32_t num_groups_x = resources->get_resolution().width / threads_per_group_width;
+    const uint32_t num_groups_y = resources->get_resolution().height / threads_per_group_width;
+
+
+    auto inner_uav = resources->create_distance_uav(false);
+
+    ID3D11UnorderedAccessView* uavs[2] = {outer_uav, inner_uav};
+
+    assert(this->composite_shader);
+    dxinit::run_compute_shader(context, this->composite_shader.Get(), 0, nullptr, nullptr, nullptr,
+                               0, uavs, 2, num_groups_x, num_groups_y, 1);
 
 }
 

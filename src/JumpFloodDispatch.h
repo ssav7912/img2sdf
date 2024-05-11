@@ -18,6 +18,10 @@ struct jump_flood_shaders
     const uint8_t* preprocess;
     size_t preprocess_size;
 
+    ///pointer to a preprocess shader that also inverts the input mask.
+    const uint8_t* preprocess_invert;
+    size_t preprocess_invert_size;
+
     ///pointer to the voronoi diagram shader bytecode (jumpflood.hlsl)
     const uint8_t* voronoi;
     size_t voronoi_size;
@@ -41,17 +45,22 @@ struct jump_flood_shaders
     const uint8_t* distance_normalise;
     size_t distance_normalise_size;
 
+    const uint8_t* composite;
+    size_t composite_size;
+
 };
 
 enum class SHADERS
 {
     PREPROCESS,
+    PREPROCESS_INVERT,
     VORONOI,
     VORONOI_NORMALISE,
     DISTANCE,
     MINMAXREDUCE_FIRST,
     MINMAXREDUCE,
-    DISTANCE_NORMALISE
+    DISTANCE_NORMALISE,
+    COMPOSITE
 };
 
 class JumpFloodDispatch {
@@ -65,7 +74,7 @@ public:
     [[nodiscard]] ID3D11ComputeShader* get_shader(SHADERS shader) const;
 
     ///Dispatches the preprocess shader.
-    void dispatch_preprocess_shader();
+    void dispatch_preprocess_shader(bool invert = false);
 
     ///dispatches the voronoi jumpflood shader.
     /// Note that this will generate a new UAV if the one in `resources` is not yet created.
@@ -86,6 +95,8 @@ public:
 
     void dispatch_distance_normalise_shader(float minimum, float maximum, bool is_signed_field);
 
+    void dispatch_composite_shader(ID3D11UnorderedAccessView* outer_uav);
+
     constexpr static size_t threads_per_group_width = 8;
 private:
 
@@ -94,12 +105,14 @@ private:
     class JumpFloodResources* resources = nullptr;
 
     ComPtr<ID3D11ComputeShader> preprocess_shader = nullptr;
+    ComPtr<ID3D11ComputeShader> preprocess_invert_shader = nullptr;
     ComPtr<ID3D11ComputeShader> voronoi_shader = nullptr;
     ComPtr<ID3D11ComputeShader> voronoi_normalise_shader = nullptr;
     ComPtr<ID3D11ComputeShader> distance_transform_shader = nullptr;
     ComPtr<ID3D11ComputeShader> min_max_reduce_firstpass_shader = nullptr;
     ComPtr<ID3D11ComputeShader> min_max_reduce_shader = nullptr;
     ComPtr<ID3D11ComputeShader> distance_normalise_shader = nullptr;
+    ComPtr<ID3D11ComputeShader> composite_shader = nullptr;
 
 
 };

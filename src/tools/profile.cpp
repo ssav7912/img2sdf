@@ -82,11 +82,26 @@ int main(void)
 
         std::cout << std::format("Running Profile for generating unsigned distance field of size {}x{}...", array.first, array.first);
 
-        double out_time = 0;
+        double out_time = 0.0;
         {
             ScopedProfile p(device, context, std::format("Unsigned Distance field of width {}", array.first), out_time);
             img2sdf.compute_unsigned_distance_field(tex_and_desc.first);
         }
+        std::cout << std::format("{} milliseconds", out_time) << std::endl;
+    }
+
+    std::cout << std::endl;
+
+    for (const auto& array :arrays)
+    {
+        auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
+        std::cout << std::format("Running Profile for generating signed distance field of size {}x{}...", array.first, array.first);
+        double out_time = 0.0;
+        {
+            ScopedProfile p(device, context, std::format("Signed Distance Field of width {}", array.first), out_time);
+            img2sdf.compute_signed_distance_field(tex_and_desc.first);
+        }
+
         std::cout << std::format("{} milliseconds", out_time) << std::endl;
     }
 

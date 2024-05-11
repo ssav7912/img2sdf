@@ -22,8 +22,6 @@ public:
 
 private:
 
-    static constexpr uint64_t query_latency = 5;
-
     struct profile_data
     {
         ComPtr<ID3D11Query> disjoint_query;
