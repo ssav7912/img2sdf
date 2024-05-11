@@ -2,7 +2,7 @@
 #define IMG2SDF_PROGRAM_H
 
 #include <string>
-#include "shader_globals.h"
+#include "../shader_globals.h"
 
 
 

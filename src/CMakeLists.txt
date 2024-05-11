@@ -1,4 +1,6 @@
 
+add_subdirectory(tools)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -53,26 +55,27 @@ foreach(FILE ${HLSL_SHADER_FILES})
 endforeach(FILE)
 
 
-add_executable(img2sdf program.cpp
-        dxinit.cpp
-        dxinit.h
-        WICTextureLoader.cpp
-        WICTextureLoader.h
-        dxutils.cpp
-        dxutils.h
-        shader_globals.h
-        program.h
-        WICTextureWriter.cpp
-        WICTextureWriter.h
-        JumpFloodResources.cpp
-        JumpFloodResources.h
-        JumpFloodDispatch.cpp
-        JumpFloodDispatch.h
-        jumpflooderror.cpp
-        jumpflooderror.h
-        img2sdf.cpp
-        img2sdf.h
-)
+#add_executable(img2sdf tools/program.cpp
+#        dxinit.cpp
+#        dxinit.h
+#        WICTextureLoader.cpp
+#        WICTextureLoader.h
+#        dxutils.cpp
+#        dxutils.h
+#        shader_globals.h
+#        program.h
+#        WICTextureWriter.cpp
+#        WICTextureWriter.h
+#        JumpFloodResources.cpp
+#        JumpFloodResources.h
+#        JumpFloodDispatch.cpp
+#        JumpFloodDispatch.h
+#        jumpflooderror.cpp
+#        jumpflooderror.h
+#        img2sdf.cpp
+#        img2sdf.h
+#
+#)
 
 #target_compile_options(img2sdf PUBLIC "/fsanitize=address")
 #target_link_options(img2sdf PUBLIC "/fsanitize=address")
@@ -85,7 +88,6 @@ add_library(libimg2sdf STATIC
         dxutils.cpp
         dxutils.h
         shader_globals.h
-        program.h
         WICTextureWriter.cpp
         WICTextureWriter.h
         JumpFloodResources.cpp

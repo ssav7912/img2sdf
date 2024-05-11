@@ -112,7 +112,7 @@ class DXSetup : public testing::TestWithParam<int32_t> {
     ASSERT_EQ(staging_desc.Height, height/JumpFloodDispatch::threads_per_group_width);
     ASSERT_EQ(staging_desc.Format, DXGI_FORMAT_R32G32_FLOAT);
 
-    auto minmax_data = dxutils::copy_to_staging<float2>(context.Get(), staging, minmax_texture);
+    auto minmax_data = dxutils::copy_to_vector<float2>(context.Get(), staging, minmax_texture);
 
     std::pair<float, float> computed_minmax = {minmax_data[0].x, minmax_data[0].y };
     if (!complete)
@@ -155,7 +155,7 @@ TEST_P(DXSetup, ReduceCustomUAV)
 
     auto staging = jfa_resources.value().create_owned_staging_texture(minmax_texture);
 
-    auto minmax_data = dxutils::copy_to_staging<float2>(context.Get(), staging, minmax_texture);
+    auto minmax_data = dxutils::copy_to_vector<float2>(context.Get(), staging, minmax_texture);
 
 
 }
@@ -187,9 +187,9 @@ TEST_P(DXSetup, ReduceCustomUAV)
 
         auto input_staging = dxutils::create_staging_texture(device.Get(), in_texture.Get());
 
-        auto data = dxutils::copy_to_staging<float>(context.Get(), staging.Get(), texture.Get());
+        auto data = dxutils::copy_to_vector<float>(context.Get(), staging.Get(), texture.Get());
 
-        auto input_data = dxutils::copy_to_staging<float>(context.Get(), input_staging.Get(), in_texture.Get());
+        auto input_data = dxutils::copy_to_vector<float>(context.Get(), input_staging.Get(), in_texture.Get());
 
         ASSERT_EQ(data.size(), input_data.size());
 

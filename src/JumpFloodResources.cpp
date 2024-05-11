@@ -36,6 +36,36 @@ JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::vector<f
         throw std::runtime_error("ID3D11Device is NULL");
     }
 
+    auto tex_and_desc = load_seeds_to_texture(device, data, width, height);
+
+    auto srv_texture = tex_and_desc.first;
+    auto srv_description =tex_and_desc.second;
+
+    ComPtr<ID3D11ShaderResourceView> srv = nullptr;
+
+    HRESULT out_srv = device->CreateShaderResourceView(srv_texture.Get(), nullptr, srv.GetAddressOf());
+    if (FAILED(out_srv))
+    {
+        throw jumpflood_error(out_srv, "Could not create SRV from input buffer.");
+    }
+
+    this->preprocess_srv = srv;
+    this->preprocess_texture = srv_texture;
+    this->input_description = srv_description;
+    this->res.height = srv_description.Height;
+    this->res.width = srv_description.Width;
+
+}
+
+
+std::pair<ComPtr<ID3D11Texture2D>, D3D11_TEXTURE2D_DESC>
+JumpFloodResources::load_seeds_to_texture(ID3D11Device *device, const std::vector<float>& data, int32_t width,
+                                      int32_t height) {
+    if (device == nullptr)
+    {
+        throw std::runtime_error("ID3D11Device is NULL");
+    }
+
     D3D11_TEXTURE2D_DESC srv_description = {0};
     srv_description.Width = width;
     srv_description.Height = height;
@@ -60,21 +90,11 @@ JumpFloodResources::JumpFloodResources(ID3D11Device *device, const std::vector<f
         throw jumpflood_error(out_tex, "Could not create SRV texture from input buffer.");
     }
 
-    ComPtr<ID3D11ShaderResourceView> srv = nullptr;
+    return {srv_texture, srv_description };
 
-    HRESULT out_srv = device->CreateShaderResourceView(srv_texture.Get(), nullptr, srv.GetAddressOf());
-    if (FAILED(out_srv))
-    {
-        throw jumpflood_error(out_tex, "Could not create SRV from input buffer.");
-    }
-
-    this->preprocess_srv = srv;
-    this->preprocess_texture = srv_texture;
-    this->input_description = srv_description;
-    this->res.height = srv_description.Height;
-    this->res.width = srv_description.Width;
 
 }
+
 
 
 JumpFloodResources::JumpFloodResources(ID3D11Device *device, ComPtr<ID3D11Texture2D> input_texture)
@@ -359,5 +379,6 @@ ID3D11ShaderResourceView *JumpFloodResources::create_reduction_view(bool regener
 
     return this->reduce_input_srv.Get();
 }
+
 
 

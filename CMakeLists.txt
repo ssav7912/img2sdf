@@ -33,13 +33,13 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 
-add_dependencies(${PROJECT_NAME} shaders)
+#add_dependencies(${PROJECT_NAME} shaders)
 add_dependencies(libimg2sdf shaders)
 
-target_link_libraries(${PROJECT_NAME}
-        PRIVATE d3d11.lib d3dcompiler.dll dxguid.lib argparse windowscodecs.lib runtimeobject.lib
-        clang_rt.asan_dynamic-x86_64.dll clang_rt.asan_dbg_dynamic-x86_64.dll )
-
+#target_link_libraries(${PROJECT_NAME}
+#        PRIVATE d3d11.lib d3dcompiler.dll dxguid.lib argparse windowscodecs.lib runtimeobject.lib
+#         )
+#clang_rt.asan_dynamic-x86_64.dll clang_rt.asan_dbg_dynamic-x86_64.dll
 # Now simply link against gtest or gtest_main as needed. Eg
 add_executable(test
         tests/minmax_test.cpp
@@ -48,5 +48,4 @@ add_executable(test
         tests/img2sdf_test.cpp
 )
 target_link_libraries(test gtest_main libimg2sdf)
-add_test(NAME example_test COMMAND example)
 

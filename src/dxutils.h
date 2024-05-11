@@ -27,39 +27,49 @@ namespace dxutils
 
     ComPtr<ID3D11Texture2D> create_staging_texture(ID3D11Device* device, ID3D11Texture2D *mimic_texture);
 
-
     ///Serial (pixel-by-pixel) implementation of min/max statistic calculator for an array.
     ///Used as a ground-truth reference for the parallel reduce minmax.
     std::pair<float, float> serial_min_max(const std::vector<float>& array);
     std::pair<float, float> serial_min_max(const std::vector<float2>& array);
 
+    D3D11_MAPPED_SUBRESOURCE
+    copy_to_staging(ID3D11DeviceContext *context, ID3D11Texture2D *staging_texture, ID3D11Texture2D *texture, D3D11_TEXTURE2D_DESC* out_desc = nullptr);
 
-    ///maps a D3D11Texture to a staging resource, and then copies it out to a vector with the specified template type.
+
+///maps a D3D11Texture to a staging resource, and then copies it out to a vector with the specified template type.
     ///Accounts for stride & padding in the texture.
     ///@param staging_texture a staging texture to copy to. Must match the @param texture description, use JumpFloodResources::create_owned_staging_texture to copy.
     ///@tparam data_type *must* match the width and layout of the DXGI_FORMAT in the @param texture and @param staging_texture
     template<typename data_type>
-    std::vector<data_type> copy_to_staging(ID3D11DeviceContext* context, ID3D11Texture2D* staging_texture, ID3D11Texture2D* texture)
+    std::vector<data_type> copy_to_vector(ID3D11DeviceContext* context, ID3D11Texture2D* staging_texture, ID3D11Texture2D* texture)
     {
-        context->CopyResource(staging_texture, texture);
-        D3D11_MAPPED_SUBRESOURCE resource;
-
-        D3D11_TEXTURE2D_DESC desc;
-        staging_texture->GetDesc(&desc);
-
+        D3D11_TEXTURE2D_DESC desc = {0};
+        D3D11_MAPPED_SUBRESOURCE resource = copy_to_staging(context, staging_texture, texture, &desc);
         std::vector<data_type> out_data(desc.Width * desc.Height, {0});
-        HRESULT map_hr = context->Map(staging_texture, 0, D3D11_MAP_READ, 0, &resource);
-        if (FAILED(map_hr))
-        {
-            throw std::runtime_error("Could not map staging texture.");
-        }
 
         dxutils::copy_to_buffer(resource.pData, desc.Height, resource.RowPitch, sizeof(data_type)*desc.Width, out_data.data());
+
+        context->Unmap(staging_texture, 0);
 
         return out_data;
     }
 
     bool is_power_of_two(uint32_t n);
+
+
+    struct query_profile
+    {
+        explicit query_profile(ID3D11DeviceContext* context) : context(context) {
+            context->Begin(nullptr);
+        };
+
+
+        ~query_profile()
+        {
+
+        }
+        ID3D11DeviceContext* context;
+    };
 
 }
 

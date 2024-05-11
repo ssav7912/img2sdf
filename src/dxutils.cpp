@@ -100,3 +100,29 @@ std::pair<float, float> dxutils::serial_min_max(const std::vector<float2>& array
 bool dxutils::is_power_of_two(uint32_t n) {
     return !(n & (n - 1));
 }
+
+D3D11_MAPPED_SUBRESOURCE
+dxutils::copy_to_staging(ID3D11DeviceContext *context, ID3D11Texture2D *staging_texture, ID3D11Texture2D *texture,
+                         D3D11_TEXTURE2D_DESC *out_desc) {
+
+    D3D11_MAPPED_SUBRESOURCE resource;
+
+    context->CopyResource(staging_texture, texture);
+
+    D3D11_TEXTURE2D_DESC desc;
+    staging_texture->GetDesc(&desc);
+
+    if (out_desc)
+    {
+        *out_desc = desc;
+    }
+
+    HRESULT map_hr = context->Map(staging_texture, 0, D3D11_MAP_READ, 0, &resource);
+    if (FAILED(map_hr))
+    {
+        throw std::runtime_error("Could not map staging texture.");
+    }
+
+    return resource;
+}
+

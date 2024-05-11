@@ -6,7 +6,6 @@
 #define IMG2SDF_JUMPFLOODRESOURCES_H
 #include "dxinit.h"
 #include "dxutils.h"
-#include "program.h"
 #include "shader_globals.h"
 #include <wrl.h>
 #include <stdexcept>
@@ -37,6 +36,8 @@ public:
     ///@param input_texture a texture with a width and height power of 2 size. Must have D3D11_USAGE_DEFAULT, DXGI_FORMAT_R32_FLOAT,
     ///and D3D11_BIND_SHADER_RESOURCE.
     JumpFloodResources(ID3D11Device* device, ComPtr<ID3D11Texture2D> input_texture);
+
+    static std::pair<ComPtr<ID3D11Texture2D>, D3D11_TEXTURE2D_DESC> load_seeds_to_texture(ID3D11Device* device, const std::vector<float>& data, int32_t width, int32_t height);
 
     ///Returns a weak pointer to the input SRV.
     ///The SRV is into an R32_Float Texture2D.

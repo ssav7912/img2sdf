@@ -17,6 +17,7 @@ class Img2SDF
 {
 public:
     Img2SDF(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> context, ComPtr<ID3D11Debug> debug_layer);
+    Img2SDF(ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> context);
 
     ///Computes a signed distance field from the provided input texture.
     ///@param input_texture a seed mask of size 2^n * 2^n, with D3D11_BIND_SHADER_RESOURCE, DXGI_FORMAT_R32_FLOAT, and D3D11_USAGE_DEFAULT.
