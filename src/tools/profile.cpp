@@ -8,6 +8,7 @@
 #include <vector>
 #include <random>
 #include <iostream>
+#include <fstream>
 #include "../dxinit.h"
 
 using namespace Microsoft::WRL;
@@ -58,8 +59,18 @@ int main(void)
         std::cout << "Done." << std::endl;
     }
 
+    std::ofstream out_csv {};
+    out_csv.open("perf.csv");
+    out_csv << "Test, ";
+    for (const auto dim : dims)
+    {
+        out_csv << std::format("{},", dim);
+    }
+    out_csv << std::endl;
+
     std::cout << std::format("Running Coarse Profiles") << std::endl;
 
+    out_csv << "voronoi diagram,";
     for (const auto& array : arrays)
     {
         auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
@@ -69,12 +80,16 @@ int main(void)
         double out_time = 0;
         {
             ScopedProfile p(device, context, std::format("Voronoi diagram of size {}x{}", array.first, array.first), out_time);
-            img2sdf.compute_voronoi_transform(tex_and_desc.first);
+            volatile auto output = img2sdf.compute_voronoi_transform(tex_and_desc.first);
         }
         std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
     }
+    out_csv << std::endl;
 
     std::cout << std::endl;
+
+    out_csv << "unsigned distance field,";
 
     for (const auto& array : arrays)
     {
@@ -85,13 +100,17 @@ int main(void)
         double out_time = 0.0;
         {
             ScopedProfile p(device, context, std::format("Unsigned Distance field of width {}", array.first), out_time);
-            img2sdf.compute_unsigned_distance_field(tex_and_desc.first);
+            volatile auto output = img2sdf.compute_unsigned_distance_field(tex_and_desc.first);
         }
         std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
+
     }
+    out_csv << std::endl;
 
     std::cout << std::endl;
 
+    out_csv << "signed distance field,";
     for (const auto& array :arrays)
     {
         auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
@@ -99,12 +118,73 @@ int main(void)
         double out_time = 0.0;
         {
             ScopedProfile p(device, context, std::format("Signed Distance Field of width {}", array.first), out_time);
-            img2sdf.compute_signed_distance_field(tex_and_desc.first);
+            volatile auto output = img2sdf.compute_signed_distance_field(tex_and_desc.first);
         }
 
         std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
+    }
+    out_csv << std::endl;
+    std::cout <<std::endl;
+
+    //without normalisation
+
+    out_csv << "voronoi diagram (unnormalised),";
+    for (const auto& array : arrays)
+    {
+        auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
+
+        std::cout << std::format("Running Profile for generating unnormalised voronoi diagram of size {}x{}...", array.first, array.first);
+
+        double out_time = 0;
+        {
+            ScopedProfile p(device, context, std::format("Voronoi diagram of size {}x{}", array.first, array.first), out_time);
+            volatile auto output = img2sdf.compute_voronoi_transform(tex_and_desc.first, false);
+        }
+        std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
+    }
+    out_csv << std::endl;
+
+    std::cout << std::endl;
+
+    out_csv << "unsigned distance field (unnormalised),";
+
+    for (const auto& array : arrays)
+    {
+        auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
+
+        std::cout << std::format("Running Profile for generating unnormalised unsigned distance field of size {}x{}...", array.first, array.first);
+
+        double out_time = 0.0;
+        {
+            ScopedProfile p(device, context, std::format("Unsigned Distance field of width {}", array.first), out_time);
+
+            volatile auto output = img2sdf.compute_unsigned_distance_field(tex_and_desc.first, false);
+        }
+        std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
+
+    }
+    out_csv << std::endl;
+
+    std::cout << std::endl;
+
+    out_csv << "signed distance field (unnormalised),";
+    for (const auto& array :arrays)
+    {
+        auto tex_and_desc = JumpFloodResources::load_seeds_to_texture(device.Get(), array.second, array.first, array.first);
+        std::cout << std::format("Running Profile for generating unnormalised signed distance field of size {}x{}...", array.first, array.first);
+        double out_time = 0.0;
+        {
+            ScopedProfile p(device, context, std::format("Signed Distance Field of width {}", array.first), out_time);
+            img2sdf.compute_signed_distance_field(tex_and_desc.first, false);
+        }
+
+        std::cout << std::format("{} milliseconds", out_time) << std::endl;
+        out_csv << std::format("{},", out_time);
     }
 
-
+    out_csv.close();
 
 }
