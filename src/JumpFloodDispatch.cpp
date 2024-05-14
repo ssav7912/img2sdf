@@ -8,8 +8,50 @@
 #include <stdexcept>
 #include <cassert>
 
-JumpFloodDispatch::JumpFloodDispatch(ID3D11Device *device, ID3D11DeviceContext *context, jump_flood_shaders byte_code,
-                                     JumpFloodResources* resources) :
+
+//shaders
+#include "shaders/jumpflood.hcs"
+#include "shaders/preprocess.hcs"
+#include "shaders/voronoi_normalise.hcs"
+#include "shaders/distance.hcs"
+#include "shaders/minmax_reduce.hcs"
+#include "shaders/minmaxreduce_firstpass.hcs"
+#include "shaders/normalise.hcs"
+#include "shaders/invert.hcs"
+#include "shaders/composite.hcs"
+
+const jump_flood_shaders JumpFloodDispatch::JUMPFLOOD_SHADERS = {
+.preprocess = g_preprocess,
+.preprocess_size = sizeof(g_preprocess),
+
+.preprocess_invert = g_invert,
+.preprocess_invert_size = sizeof(g_invert),
+
+.voronoi = g_main,
+.voronoi_size = sizeof(g_main),
+
+.voronoi_normalise = g_voronoi_normalise,
+.voronoi_normalise_size = sizeof(g_voronoi_normalise),
+
+.distance_transform = g_distance,
+.distance_transform_size = sizeof(g_distance),
+
+.min_max_reduce_firstpass = g_reduce_firstpass,
+.min_max_reduce_firstpass_size = sizeof(g_reduce_firstpass),
+
+.min_max_reduce = g_reduce,
+.min_max_reduce_size = sizeof(g_reduce),
+
+.distance_normalise = g_normalise,
+.distance_normalise_size = sizeof(g_normalise),
+
+.composite = g_composite,
+.composite_size = sizeof(g_composite),
+
+};
+
+JumpFloodDispatch::JumpFloodDispatch(ID3D11Device *device, ID3D11DeviceContext *context,
+                                     JumpFloodResources* resources, jump_flood_shaders byte_code) :
 device(device), context(context), resources(resources) {
 
     if (device == nullptr || context == nullptr)
@@ -108,6 +150,8 @@ device(device), context(context), resources(resources) {
     }
 
 }
+
+
 
 ID3D11ComputeShader *JumpFloodDispatch::get_shader(SHADERS shader) const {
     switch (shader)

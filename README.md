@@ -43,17 +43,18 @@ that is non-zero is treated as an input seed.
 
 Below are the coarse timings for the jumpflooding functions provided. These were created
 by generating seed textures with random distributions of seed pixels of varying sizes, and
-computing each of the functions for them. Timing information is retrieved using the technique described here: https://therealmjp.github.io/posts/profiling-in-dx11-with-queries/
+computing each of the functions for them. Timing information is retrieved using the technique described here: https://therealmjp.github.io/posts/profiling-in-dx11-with-queries/,
+with 1000 runs per benchmark per resource size. All timings are in milliseconds.
 
 
-| Function Name           | 8x8                  | 16x16   | 32x32               | 64x64   | 128x128 | 256x256             | 512x512 | 1024x1024 | 2048x2048          | 4096x4096 | 8192x8192          | units       |
-|-------------------------|----------------------|---------|---------------------|---------|---------|---------------------|---------|-----------|--------------------|-----------|--------------------|-------------|
-| voronoi diagram         | 0.028079999999999997 | 0.03032 | 0.03368             | 0.03532 | 0.05328 | 0.14976             | 0.58284 | 2.75704   | 7.25924            | 28.5062   | 123.14176          | milliseconds |
-| unsigned distance field | 0.34445              | 0.13625 | 0.16032000000000002 | 0.19394 | 0.20943 | 0.32482             | 1.10505 | 3.2116    | 10.792629999999999 | 31.24162  | 133.71495          | milliseconds |
-| signed distance field   | 0.26050999999999996  | 0.20677 | 0.19284             | 0.23734 | 0.2691  | 0.48718999999999996 | 1.3873  | 6.05148   | 11.25882           | 65.52313  | 257.50334000000004 | milliseconds |
+|Function Name|8x8       |16x16     |32x32     |64x64     |128x128   |256x256   |512x512   |1024x1024 |2048x2048  |4096x4096  |8192x192   |
+|-------------|----------|----------|----------|----------|----------|----------|----------|----------|-----------|-----------|-----------|
+|voronoi diagram|0.02756   |0.02956   |0.03236   |0.03552   |0.06192   |0.15884   |0.6354    |3.18748   |6.74952    |28.49016   |123.90044  |
+|unsigned distance field|0.40905   |0.15913   |0.15968   |0.18228   |0.45768   |0.34281   |0.81117   |3.21409   |8.89338    |31.78636   |131.29762  |
+|signed distance field|0.2551    |0.21757   |0.22282   |0.22588   |0.28389   |0.54302   |1.39451   |5.98958   |11.48001   |54.56952   |256.89974  |
 
 Graphed below (log scale):
-![img.png](img.png)
+![img_2.png](img_2.png)
 
 This demonstrates a loglinear performance, which matches the big-O bounds for the algorithm. 
 For small textures, the runtime is dominated by the minmax reduction that needs to be done to normalise the output,
@@ -61,16 +62,37 @@ particularly as my implementation falls back to a serial (CPU) minimax algorithm
 a wavefront (8x8 pixels). This means that the benefits of a parallel reduction don't really start to appear until our textures
 are 128x128 pixels in size. 
 
-| Function Name           | 8x8                  | 16x16   | 32x32               | 64x64   | 128x128 | 256x256             | 512x512 | 1024x1024 | 2048x2048          | 4096x4096 | 8192x8192          | units        |
-|-----------------------|--------------------|-------|-------------------|-------|-------|-------------------|-------|-------|------------------|--------|------------------|--------------|
-|voronoi diagram (unnormalised)|0.02448             |0.02624|0.34016            |0.0318 |0.0504 |0.14695999999999998|0.56108|2.43788|10.473680000000002|30.17116|122.79082         | milliseconds |
-|unsigned distance field (unnormalised)|0.00792             |0.014199999999999999|0.015359999999999999|0.01764|0.0276 |0.14504            |0.5738800000000001|2.75936|8.78908           |27.847839999999998|124.64032         | milliseconds |
-|signed distance field (unnormalised)|0.019559999999999998|0.06148|0.057080000000000006|0.06548|0.11120000000000001|0.29035999999999995|1.1581199999999998|5.60756|9.04504           |53.92588|251.42989         | milliseconds |
-
 ![img_1.png](img_1.png)
+
 Removing the normalisation pass eliminates most of this overhead for small textures. Computing the signed
 distance field takes double the time as the current implementation performs two separate unsigned distance passes, one on an inverted source,
 and composites the result in later. This can most likely be merged into a single pass.
+
+|Function Name|8x8       |16x16     |32x32     |64x64     |128x128   |256x256   |512x512   |1024x1024 |2048x2048  |4096x4096  |8192x192   |
+|-------------|----------|----------|----------|----------|----------|----------|----------|----------|-----------|-----------|-----------|
+|voronoi diagram (unnormalised)|0.0242196 |0.02931456|0.03124156|0.03569368|0.05721184|0.15094444|0.5695222 |2.50745572|9.3002798  |30.25394848|124.9395971|
+|unsigned distance field (unnormalised)|0.02699344|0.0312328 |0.03323916|0.0380942 |0.05935462|0.15259252|0.58686816|2.56998052|9.37712678 |29.6991648 |128.9554467|
+|signed distance field (unnormalised)|0.05367596|0.05955512|0.06637152|0.07835928|0.12483532|0.316812  |1.183537  |5.0593942 |11.3952964 |55.89069016|255.8165938|
+
+Finer grain profiling was also done in each individual kernel in the pipeline. The profiling includes the time spent on the
+CPU to create any required resources (aside from dependencies on other kernels), and includes timings for multiple dispatches
+where that's needed for a given shader, such as the minmax reduction and the voronoi shader.
+
+Below are the
+results for 1000 runs on a 2048x2048 texture:
+![img_3.png](img_3.png)
+
+|Kernel    |min (ms)  |max (ms)  |average time (ms)|
+|----------|----------|----------|-----------------|
+|Preprocess Shader|0.24804   |0.81044   |0.44811532       |
+|Voronoi Shader|4.62988   |11.18076  |9.35256104       |
+|Distance Shader|0.10284   |0.4724    |0.17538288       |
+|MinMax Reduce Shader|0.0958    |0.77176   |0.27933844       |
+|Distance Normalise Shader|0.04496   |0.18292   |0.1082066        |
+|Composite Shader|0.0268    |0.13744   |0.08472964       |
+
+Surprisingly, the vast majority of time is spent in the jump-flood shader itself (Voronoi Shader). I was expecting the 
+min-max reduction to have a higher overhead due to its poor thread residency. Warrants further investigation.   
 
 ## References
 https://therealmjp.github.io/posts/profiling-in-dx11-with-queries/

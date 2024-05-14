@@ -62,39 +62,9 @@ Img2SDF::compute_signed_distance_field(Microsoft::WRL::ComPtr<ID3D11Texture2D> i
     ID3D11Buffer* outer_const_buffer = outer_jfa_resources.create_const_buffer();
     ID3D11Buffer* inner_const_buffer = inner_jfa_resources.create_const_buffer();
 
-    jump_flood_shaders shaders {
-            .preprocess = g_preprocess,
-            .preprocess_size = sizeof(g_preprocess),
-
-            .preprocess_invert = g_invert,
-            .preprocess_invert_size = sizeof(g_invert),
-
-            .voronoi = g_main,
-            .voronoi_size = sizeof(g_main),
-
-            .voronoi_normalise = g_voronoi_normalise,
-            .voronoi_normalise_size = sizeof(g_voronoi_normalise),
-
-            .distance_transform = g_distance,
-            .distance_transform_size = sizeof(g_distance),
-
-            .min_max_reduce_firstpass = g_reduce_firstpass,
-            .min_max_reduce_firstpass_size = sizeof(g_reduce_firstpass),
-
-            .min_max_reduce = g_reduce,
-            .min_max_reduce_size = sizeof(g_reduce),
-
-            .distance_normalise = g_normalise,
-            .distance_normalise_size = sizeof(g_normalise),
-
-            .composite = g_composite,
-            .composite_size = sizeof(g_composite),
-
-    };
-
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch outer_dispatch {this->device.Get(), this->context.Get(), shaders, &outer_jfa_resources};
-    JumpFloodDispatch inner_dispatch {this->device.Get(), this->context.Get(), shaders, &inner_jfa_resources};
+    JumpFloodDispatch outer_dispatch {this->device.Get(), this->context.Get(), &outer_jfa_resources};
+    JumpFloodDispatch inner_dispatch {this->device.Get(), this->context.Get(), &inner_jfa_resources};
 
     outer_dispatch.dispatch_preprocess_shader();
     outer_dispatch.dispatch_voronoi_shader();
@@ -164,32 +134,8 @@ Img2SDF::compute_unsigned_distance_field(ComPtr<ID3D11Texture2D> input_texture, 
 
     ID3D11Buffer* const_buffer = jfa_resources.create_const_buffer();
 
-    jump_flood_shaders shaders {
-            .preprocess = g_preprocess,
-            .preprocess_size = sizeof(g_preprocess),
-
-            .voronoi = g_main,
-            .voronoi_size = sizeof(g_main),
-
-            .voronoi_normalise = g_voronoi_normalise,
-            .voronoi_normalise_size = sizeof(g_voronoi_normalise),
-
-            .distance_transform = g_distance,
-            .distance_transform_size = sizeof(g_distance),
-
-            .min_max_reduce_firstpass = g_reduce_firstpass,
-            .min_max_reduce_firstpass_size = sizeof(g_reduce_firstpass),
-
-            .min_max_reduce = g_reduce,
-            .min_max_reduce_size = sizeof(g_reduce),
-
-            .distance_normalise = g_normalise,
-            .distance_normalise_size = sizeof(g_normalise)
-
-    };
-
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), shaders, &jfa_resources};
+    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), &jfa_resources};
 
     dispatch.dispatch_preprocess_shader();
     dispatch.dispatch_voronoi_shader();
@@ -244,32 +190,9 @@ ComPtr<ID3D11Texture2D> Img2SDF::compute_voronoi_transform(ComPtr<ID3D11Texture2
 
     ID3D11Buffer* const_buffer = jfa_resources.create_const_buffer();
 
-    jump_flood_shaders shaders {
-            .preprocess = g_preprocess,
-            .preprocess_size = sizeof(g_preprocess),
-
-            .voronoi = g_main,
-            .voronoi_size = sizeof(g_main),
-
-            .voronoi_normalise = g_voronoi_normalise,
-            .voronoi_normalise_size = sizeof(g_voronoi_normalise),
-
-            .distance_transform = g_distance,
-            .distance_transform_size = sizeof(g_distance),
-
-            .min_max_reduce_firstpass = g_reduce_firstpass,
-            .min_max_reduce_firstpass_size = sizeof(g_reduce_firstpass),
-
-            .min_max_reduce = g_reduce,
-            .min_max_reduce_size = sizeof(g_reduce),
-
-            .distance_normalise = g_normalise,
-            .distance_normalise_size = sizeof(g_normalise)
-
-    };
 
     //dispatcher probably shouldn't also be compiling.
-    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), shaders, &jfa_resources};
+    JumpFloodDispatch dispatch {this->device.Get(), this->context.Get(), &jfa_resources};
 
     dispatch.dispatch_preprocess_shader();
     dispatch.dispatch_voronoi_shader();

@@ -10,6 +10,8 @@
 #include <d3d11.h>
 #include "jumpflooderror.h"
 
+
+
 using namespace Microsoft::WRL;
 
 struct jump_flood_shaders
@@ -63,12 +65,12 @@ enum class SHADERS
     COMPOSITE
 };
 
+
 class JumpFloodDispatch {
 public:
     ///Creates shaders from compiled bytecode. Note that any of byte_code's fields may be nullptr,
     ///and the constructor will simply skip this shader.
-    JumpFloodDispatch(ID3D11Device* device, ID3D11DeviceContext* context,
-                      jump_flood_shaders byte_code, class JumpFloodResources* resources);
+    JumpFloodDispatch(ID3D11Device* device, ID3D11DeviceContext* context, class JumpFloodResources* resources,  jump_flood_shaders byte_code = JUMPFLOOD_SHADERS);
 
     ///Gets the D3D shader interface for the specified shader.
     [[nodiscard]] ID3D11ComputeShader* get_shader(SHADERS shader) const;
@@ -99,6 +101,9 @@ public:
 
     constexpr static size_t threads_per_group_width = 8;
 private:
+
+
+    static const jump_flood_shaders JUMPFLOOD_SHADERS;
 
     ID3D11Device* device = nullptr;
     ID3D11DeviceContext* context = nullptr;
